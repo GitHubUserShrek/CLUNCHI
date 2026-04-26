@@ -1,17 +1,3 @@
-// ═══════════════════════════════════════════════════════
-//  main.cpp — System bootstrap and main loop
-//
-//  V2 responsibilities:
-//    • Owns all module instances
-//    • Calls modules in the correct order each loop()
-//    • Handles WiFi lifecycle (deauth/netHealth/dashboard)
-//    • Checks menuWantsRadar() and calls triggerRadar()
-//    • Passes TouchEvent from touch → mood
-//    • Does NOT set mood directly
-//    • Does NOT trigger animations directly
-//    • Does NOT play sounds directly
-// ═══════════════════════════════════════════════════════
-
 #include <Arduino.h>
 #include <Preferences.h>
 #include "config.h"
