@@ -13,6 +13,8 @@ Built on an ESP32-C3 supermini with a 1.3" SH1106 OLED, capacitive touch, and a 
 - touch-driven mood/audio/animation reactions
 - early BLE radar functionality (currently only detects Flipper Zero)
 
+- Alot of the personality and info comes out in the serial monitor
+
 This project is currently in **beta** and active development is happening on the firmware, dashboard, and future hardware ports.
 
 ---
