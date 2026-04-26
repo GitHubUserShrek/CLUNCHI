@@ -2,15 +2,10 @@
 #include <Preferences.h>
 
 void Audio::begin() {
-    #if ESP_ARDUINO_VERSION_MAJOR >= 3
-        ledcAttach(PIN_SPEAKER, 2000, 8);
-    #else
         ledcSetup(TONE_CHANNEL, 2000, 8);
         ledcAttachPin(PIN_SPEAKER, TONE_CHANNEL);
-    #endif
     stop();
 
-    // Load saved state
     Preferences prefs;
     if (prefs.begin("clunchi", true)) {
         volume_      = prefs.getUChar("volume", DEFAULT_VOLUME);
@@ -22,21 +17,12 @@ void Audio::begin() {
 }
 
 void Audio::tone(int freq) {
-    #if ESP_ARDUINO_VERSION_MAJOR >= 3
-        ledcWriteTone(PIN_SPEAKER, freq);
-        ledcWrite(PIN_SPEAKER, volume_);
-    #else
         ledcWriteTone(TONE_CHANNEL, freq);
         ledcWrite(TONE_CHANNEL, volume_);
-    #endif
 }
 
 void Audio::stop() {
-    #if ESP_ARDUINO_VERSION_MAJOR >= 3
-        ledcWrite(PIN_SPEAKER, 0);
-    #else
         ledcWrite(TONE_CHANNEL, 0);
-    #endif
 }
 
 void Audio::beep(int freq, uint32_t duration) {
@@ -81,7 +67,6 @@ void Audio::toggleMute() {
     }
 }
 
-// ── Universal ────────────────────────────────────────
 void Audio::chirp() {
     for (int f = 2000; f < 3500; f += 100) {
         tone(f);
@@ -90,7 +75,6 @@ void Audio::chirp() {
     stop();
 }
 
-// ── Mood sounds ──────────────────────────────────────
 void Audio::happy() {
     beep(1500, 60);
     delay(30);
@@ -157,7 +141,6 @@ void Audio::heartEyes() {
     happy();
 }
 
-// ── Radar ────────────────────────────────────────────
 void Audio::radarOn() {
     beep(800, 50);
     delay(80);

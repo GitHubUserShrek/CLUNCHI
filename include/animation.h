@@ -17,7 +17,6 @@ struct AnimState {
     float headTilt = 0;
     float spiralAngle = 0;
 
-    // Dribble scatter offsets (eyes + mouth drift from center)
     float leftEyeOffX  = 0;
     float leftEyeOffY  = 0;
     float rightEyeOffX = 0;
@@ -62,11 +61,10 @@ private:
     float    dribbleVelocity_ = 0;
     float    dribblePos_ = 0;
 
-    // Scatter: current position and target
     float    scatterLeftEyeX_  = 0, scatterLeftEyeY_  = 0;
     float    scatterRightEyeX_ = 0, scatterRightEyeY_ = 0;
     float    scatterMouthX_    = 0, scatterMouthY_     = 0;
-    // Target is always 0 (center), current drifts back via lerp
+
     float    targetLeftEyeX_   = 0, targetLeftEyeY_    = 0;
     float    targetRightEyeX_  = 0, targetRightEyeY_   = 0;
     float    targetMouthX_     = 0, targetMouthY_       = 0;

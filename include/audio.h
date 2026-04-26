@@ -11,35 +11,30 @@ public:
     void toggleMute();
     bool isMuted() const { return muted_; }
 
-    // ── Raw ──────────────────────────────────────────
     void beep(int freq, uint32_t duration);
 
-    // ── Universal ────────────────────────────────────
-    void chirp();           // tap feedback
+    void chirp();          
 
-    // ── Mood sounds ──────────────────────────────────
-    void happy();           // ascending cheerful
-    void sleepy();          // descending drowsy
-    void annoyed();         // single low grunt
-    void curious();         // two rising notes
-    void jazzed();          // two bouncy notes
-    void enraged();         // alarm sequence
-    void dead();            // descending death
-    void dribble();         // chaotic entry
+    void happy();           
+    void sleepy();          
+    void annoyed();         
+    void curious();         
+    void jazzed();          
+    void enraged();       
+    void dead();            
+    void dribble();         
 
-    // ── Spiral / heart eyes ──────────────────────────
-    void spiralEyes();      // dizzy sound
-    void heartEyes();       // same as happy()
+    void spiralEyes();      
+    void heartEyes();       
 
-    // ── Radar ────────────────────────────────────────
-    void radarOn();         // ascending triple
-    void radarOff();        // descending double
-    void radarPing();       // fast triple high
-    void radarAlert();      // alarm (same as enraged)
+    void radarOn();         
+    void radarOff();        
+    void radarPing();       
+    void radarAlert();      
 
 private:
     uint8_t volume_ = DEFAULT_VOLUME;
-    uint8_t savedVolume_ = DEFAULT_VOLUME;  // NEW
-    bool    muted_ = false;                 // NEW
+    uint8_t savedVolume_ = DEFAULT_VOLUME;  
+    bool    muted_ = false;                 
     void tone(int freq);
 };

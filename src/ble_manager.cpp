@@ -294,8 +294,6 @@ void bleUpdate() {
     if (_radarMode) {
         if (bleScanActive && millis() - _scanStartTime > RADAR_SWEEP_MS) {
             _pScan->stop();
-            // bleScanActive set false by onScanEnd callback
-            // but set here too as safety net
             bleScanActive = false;
             Serial.printf("[BLE Radar] Sweep done: %d devices, %d alerts\n",
                           bleCount, bleAlertCount());

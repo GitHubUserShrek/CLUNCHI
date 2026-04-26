@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════
-//  menu.cpp — Menu UI system
-//
-//  Internal action + draw functions are static (private).
-//  Only the public API from menu.h is visible outside.
-// ═══════════════════════════════════════════════════════
-
 #include "menu.h"
 #include "touch.h"
 #include "display.h"
@@ -18,13 +11,11 @@
 extern Display display;
 extern Audio   audio;
 
-// ── Menu state ───────────────────────────────────────
 static MenuMode currentMenu     = MENU_OFF;
 static int      menuCursor      = 0;
 static bool     menuLongHandled = true;
-static bool     _wantsRadar     = false;   // NEW
+static bool     _wantsRadar     = false;  
 
-// ── WiFi menu state ──────────────────────────────────
 static bool wifiMenuScanning  = false;
 static int  wifiMenuCursor    = 0;
 static int  connectMenuCursor = 0;
@@ -32,11 +23,9 @@ static bool connectInProgress = false;
 static int  wifiInfoPage      = 0;
 static const int WIFI_INFO_PAGES = 4;
 
-// ── BLE menu state ───────────────────────────────────
 static int  bleMenuCursor   = 0;
 static bool bleMenuScanning = false;
 
-// ── Sleep timer state ────────────────────────────────
 static Preferences prefs;
 static int         sleepTimerCursor    = 1;
 static int         sleepTimerActiveIdx = 1;
@@ -50,15 +39,12 @@ static const TimerOption sleepTimerOpts[] = {
     { "Never",      0    }
 };
 
-// ── Confirm state ────────────────────────────────────
 static char     confirmLine1[32] = "";
 static char     confirmLine2[32] = "";
 static MenuMode confirmReturnTo  = MENU_MAIN;
 
-// ── Menu tables ──────────────────────────────────────
 struct MenuItem { const char* name; void (*action)(); };
 
-// Forward declarations (private to this file)
 static void act_back();
 static void act_exit();
 static void act_settings();
@@ -132,7 +118,6 @@ static const MenuItem bleOpts[]  = {
     { "Back",  act_back       }
 };
 
-// ── Actions ──────────────────────────────────────────
 static void act_back() {
     if (currentMenu == MENU_VOLUME || currentMenu == MENU_SLEEP_TIMER) {
         currentMenu = MENU_SETTINGS;
@@ -165,7 +150,7 @@ static void act_vol_down() {
 static void act_mute() {
     audio.toggleMute();
     if (!audio.isMuted()) {
-        audio.beep(440, 20);  // feedback that sound is back
+        audio.beep(440, 20);  
     }
 }
 
@@ -235,10 +220,6 @@ static void act_ble_scan() {
 }
 
 static void act_ble_radar() {
-    // ── KEY CHANGE ───────────────────────────────────
-    // Don't call triggerRadar() directly.
-    // Set a flag. main.cpp reads menuWantsRadar() and
-    // calls triggerRadar() in the right context.
     _wantsRadar = true;
     exitMenu();
     menuLongHandled = true;
@@ -256,7 +237,6 @@ static void act_sleep_timer() {
     menuLongHandled  = true;
 }
 
-// ── Public flag accessor ─────────────────────────────
 bool menuWantsRadar() {
     if (_wantsRadar) {
         _wantsRadar = false;
@@ -265,7 +245,6 @@ bool menuWantsRadar() {
     return false;
 }
 
-// ── Draw helpers ─────────────────────────────────────
 static void drawWifiInfoScreen() {
     static char l1[32], l2[32], l3[32], l4[32];
     char title[16];
@@ -414,7 +393,6 @@ static void drawConfirmScreen() {
     display.drawConfirm(confirmLine1, confirmLine2);
 }
 
-// ── Public API ───────────────────────────────────────
 void menuBegin() { currentMenu = MENU_OFF; }
 void exitMenu()  { currentMenu = MENU_OFF; }
 bool isMenuActive() { return currentMenu != MENU_OFF; }
@@ -565,7 +543,6 @@ void menuUpdate() {
         return;
     }
 
-    // ── Standard menu navigation ─────────────────────
     const char**     items = nullptr;
     const MenuItem*  opts  = nullptr;
     int              size  = 0;

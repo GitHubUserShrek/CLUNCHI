@@ -27,20 +27,13 @@
 #include "net_health.h"
 #include "web_dashboard.h"
 
-// ── Module instances (owned here, extern'd elsewhere) ─
 Display   display;
 Audio     audio;
 Animation animation;
 
-// ── Frame timing ──────────────────────────────────────
 static uint32_t       lastFrame = 0;
 static const uint32_t frameTime = 1000 / FPS_TARGET;
 
-// ─────────────────────────────────────────────────────
-//  WiFi lifecycle
-//  The ONLY place deauth/netHealth/dashboard start/stop.
-//  Reacts to one-shot flags from wifi_manager.
-// ─────────────────────────────────────────────────────
 static void handleWifiLifecycle() {
     if (wifiJustConnected()) {
         Serial.println("[System] WiFi up — starting background systems.");
@@ -56,9 +49,6 @@ static void handleWifiLifecycle() {
     }
 }
 
-// ─────────────────────────────────────────────────────
-//  Periodic status log
-// ─────────────────────────────────────────────────────
 static void handlePeriodicLog(uint32_t now) {
     static uint32_t lastPrint = 0;
     if (now - lastPrint < 90000) return;
@@ -83,59 +73,42 @@ static void handlePeriodicLog(uint32_t now) {
     }
 }
 
-// ─────────────────────────────────────────────────────
-//  Setup
-// ─────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
     delay(900);
     Serial.println("\n[System] CLUNCHI V2 Booting...");
 
-    // NVS namespace init
     Preferences nvsInit;
     nvsInit.begin("clunchi", false); nvsInit.end();
     nvsInit.begin("wifi",    false); nvsInit.end();
     Serial.println("[System] NVS ready.");
 
-    // Audio first — gives boot feedback
     audio.begin();
     audio.beep(1000, 50);
 
-    // Display
     if (!display.begin()) {
         Serial.println("[System] Display FAILED. Halting.");
         while (true) { audio.beep(200, 100); delay(500); }
     }
 
-    // WiFi radio init — does NOT connect yet
-    // Connection fires automatically if credentials exist
     wifiBegin();
 
-    // Splash while touch calibrates
     display.drawSplash();
     audio.chirp();
     delay(800);
 
-    // Input + UI
     calibrateTouch();
     menuBegin();
     animation.begin();
 
-    // Mood machine
     moodBegin();
 
     Serial.println("[System] Boot complete.");
 }
 
-// ─────────────────────────────────────────────────────
-//  Main loop
-// ─────────────────────────────────────────────────────
 void loop() {
     uint32_t now = millis();
 
-    // ── Background systems ────────────────────────────
-    // Non-blocking — must run every loop() regardless
-    // of frame rate, menu state, or portal mode
     wifiUpdate();
     wifiProcessPortal();
     handleWifiLifecycle();
@@ -145,9 +118,6 @@ void loop() {
     netHealthUpdate();
     dashboardUpdate();
 
-    // ── Portal mode ───────────────────────────────────
-    // Minimal loop — just keep portal alive and allow
-    // menu interaction to exit portal if needed
     if (wifiIsPortalActive()) {
         handleTouch();
 
@@ -161,53 +131,37 @@ void loop() {
         return;
     }
 
-    // ── Block while connecting ────────────────────────
     if (connectState == CONN_TRYING) {
         delay(1);
         return;
     }
 
-    // ── Frame rate gate ───────────────────────────────
     if (now - lastFrame < frameTime) return;
     lastFrame = now;
 
-    // ── Input ─────────────────────────────────────────
     handleTouch();
 
-    // ── Menu mode ─────────────────────────────────────
     if (isMenuActive()) {
         menuUpdate();
 
-        // Radar is requested via flag, not direct call.
-        // Checked here so triggerRadar() runs in the
-        // correct context outside of menu internals.
         if (menuWantsRadar()) {
             triggerRadar();
         }
         return;
     }
 
-    // ── Face mode ─────────────────────────────────────
-
-    // Radar mode handles its own tap logic inside moodUpdate()
-    // using raw touch globals — evaluateTaps() is skipped
     if (!isRadarActive()) {
         evaluateTaps();
     }
 
-    // Consume the event (always — mood decides what to do with it)
     TouchEvent ev = consumeTouchEvent();
 
-    // Mood is the single brain — receives event, owns all reactions
     moodUpdate(ev);
 
-    // Animation math — pure, no side effects
     animation.update(mood);
 
-    // Render
     display.drawFace(mood, animation.getState());
     display.drawStatusBar(isTouched, audio.getVolume());
 
-    // Periodic serial log
     handlePeriodicLog(now);
 }

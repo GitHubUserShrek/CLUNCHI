@@ -15,8 +15,6 @@ static volatile uint32_t _lastLogTime = 0;
 static const uint32_t    LOG_THROTTLE_MS = 500;
 static volatile bool     _newAlert = false;
 
-
-// ── Sniffer callback ─────────────────────────────────
 static void _deauthSniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
     if (type != WIFI_PKT_MGMT) return;
 
@@ -66,8 +64,6 @@ static void _deauthSniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
     _newAlert = true;
 }
 
-
-// ── Lifecycle ────────────────────────────────────────
 void deauthDetectorBegin() {
     if (deauthDetectorActive) return;
     if (!wifiConnected()) {
@@ -121,8 +117,6 @@ void deauthDetectorEnd() {
 
 bool isDeauthDetectorActive() { return deauthDetectorActive; }
 
-
-// ── Update ───────────────────────────────────────────
 void deauthDetectorUpdate() {
     if (!deauthDetectorActive) return;
 
@@ -166,8 +160,6 @@ void deauthDetectorUpdate() {
     }
 }
 
-
-// ── Alert queries ────────────────────────────────────
 bool deauthHasRecentAlert(uint32_t withinMs) {
     if (deauthTotalCount == 0) return false;
     return (millis() - deauthLastTime) <= withinMs;
@@ -182,26 +174,21 @@ uint32_t deauthRecentCount(uint32_t withinMs) {
     return count;
 }
 
-
-// ── Threat analysis ──────────────────────────────────
 uint8_t deauthThreatScore() {
     if (deauthTotalCount == 0) return 0;
 
     uint8_t score = 0;
 
-    // Recency
     uint32_t msSinceLast = millis() - deauthLastTime;
     if (msSinceLast < 1000)       score += 30;
     else if (msSinceLast < 5000)  score += 20;
     else if (msSinceLast < 30000) score += 10;
 
-    // Volume in last 10 seconds
     uint32_t recent = deauthRecentCount(10000);
     if (recent >= 10)     score += 40;
     else if (recent >= 5) score += 25;
     else if (recent >= 2) score += 10;
 
-    // Targeting
     for (int i = 0; i < deauthLogCount; i++) {
         if (deauthLog[i].isTargeted) {
             score += 30;
@@ -280,8 +267,6 @@ int deauthMostActiveSourceIndex() {
     return 0;
 }
 
-
-// ── Debug ────────────────────────────────────────────
 void deauthPrintInfo() {
     Serial.println();
     Serial.println("[Deauth] ==========================================");
@@ -337,8 +322,6 @@ void deauthPrintLog() {
     Serial.println();
 }
 
-
-// ── Helpers ──────────────────────────────────────────
 String deauthMacToString(const uint8_t* mac) {
     char buf[18];
     snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x",

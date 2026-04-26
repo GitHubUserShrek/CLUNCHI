@@ -34,57 +34,33 @@ void Display::drawSplash() {
     render();
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Spiral eye renderer
-//
-//  Draws an Archimedean spiral inside a circular eye.
-//  The spiral has NH_SPIRAL_ARMS arms that rotate based on
-//  the angle parameter (driven by animation timer).
-//
-//  How it works:
-//    - We trace points along the spiral formula:
-//        r = (arm_spacing / (2π)) * θ
-//    - For each point, rotate by the animation angle
-//    - Clip to the eye radius
-//    - Plot the pixel
-//
-//  The result is a classic cartoon hypnosis spiral that
-//  smoothly rotates, rendered entirely with drawPixel
-//  so it stays lightweight on the SH1106.
-// ─────────────────────────────────────────────────────────────
-
 void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
-    const int   arms       = 2;        // number of spiral arms
-    const float armSpacing = 3.5f;     // pixels between each spiral wrap
-    const float thetaStep  = 0.15f;    // angular resolution (smaller = denser)
-    const float maxTheta   = radius * (2.0f * PI) / armSpacing;  // stop at edge
+    const int   arms       = 2;    
+    const float armSpacing = 3.5f;   
+    const float thetaStep  = 0.15f;  
+    const float maxTheta   = radius * (2.0f * PI) / armSpacing; 
 
     for (int arm = 0; arm < arms; arm++) {
-        float armOffset = arm * (2.0f * PI / arms);  // evenly space arms
+        float armOffset = arm * (2.0f * PI / arms);
 
         for (float theta = 0.5f; theta < maxTheta; theta += thetaStep) {
-            // Archimedean spiral: r grows linearly with angle
             float r = (armSpacing / (2.0f * PI)) * theta;
 
-            if (r > radius) break;  // clip to eye boundary
+            if (r > radius) break; 
 
-            // Rotate the entire spiral by the animation angle
             float drawAngle = theta + angle + armOffset;
 
             int px = cx + (int)(cos(drawAngle) * r);
             int py = cy + (int)(sin(drawAngle) * r);
 
-            // Bounds check against display
             if (px >= 0 && px < OLED_WIDTH && py >= 0 && py < OLED_HEIGHT) {
                 u8g2_.drawPixel(px, py);
             }
         }
     }
 
-    // Center dot for visual anchor
     u8g2_.drawDisc(cx, cy, 1);
 
-    // Outer ring to contain the spiral
     u8g2_.drawCircle(cx, cy, radius);
 }
 
@@ -97,7 +73,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
 
     int offsetY = (int)anim.bounceY + (int)anim.breathY + (int)anim.squishY;
 
-    // ── Apply scatter offsets during dribble ──────────────────────
     int leftX  = baseLeftX  + (int)anim.leftEyeOffX;
     int rightX = baseRightX + (int)anim.rightEyeOffX;
     int leftEyeYOff  = (int)anim.leftEyeOffY;
@@ -108,16 +83,12 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
     int eyeYLeft  = baseEyeY + offsetY + leftEyeYOff;
     int eyeYRight = baseEyeY + offsetY + rightEyeYOff;
     int mouthY    = 46 + offsetY + mouthYOff;
-    int mouthCX   = 64 + mouthXOff;  // mouth center X (normally 64)
+    int mouthCX   = 64 + mouthXOff; 
 
     int eyeHeight = eyeR * 2;
     if (anim.blink > 0) {
         eyeHeight = std::max(2, (int)(eyeHeight * (1.0f - anim.blink)));
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  EYES
-    // ═══════════════════════════════════════════════════════════
 
     if (currentMood == SLEEPY) {
         u8g2_.drawHLine(leftX - 7, eyeYLeft, 14);
@@ -230,12 +201,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  MOUTH — uses mouthCX and mouthY with scatter offsets
-    // ═══════════════════════════════════════════════════════════
-
     if (anim.spiralEyes && anim.dribbling) {
-        // Dizzy wavy mouth, centered on scattered position
         int wave = (int)(sin(millis() / 200.0f) * 3.0f);
         u8g2_.drawLine(mouthCX - 12, mouthY + wave, mouthCX - 6, mouthY - wave);
         u8g2_.drawLine(mouthCX - 6, mouthY - wave, mouthCX, mouthY + wave);
@@ -294,10 +260,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawHLine(mouthCX - 10, mouthY, 20);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  DECORATIONS
-    // ═══════════════════════════════════════════════════════════
-
     if (!anim.dribbling) {
         if (currentMood == HAPPY)   drawHappySparkles();
         if (currentMood == SLEEPY && (millis() / 500) % 2) drawSleepZzz(millis() / 300);
@@ -310,10 +272,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  FRAME BORDER
-    // ═══════════════════════════════════════════════════════════
-
     if (currentMood == ENRAGED) {
         u8g2_.drawFrame(0, 0, OLED_WIDTH, OLED_HEIGHT);
     } else {
@@ -322,10 +280,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
 
     render();
 }
-
-// ─────────────────────────────────────────────────────────────
-//  Decoration helpers (unchanged)
-// ─────────────────────────────────────────────────────────────
 
 void Display::drawSleepZzz(int frame) {
     u8g2_.setFont(u8g2_font_5x7_tr);

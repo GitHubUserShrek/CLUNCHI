@@ -9,7 +9,6 @@
 static WebServer* _server = nullptr;
 static bool _active = false;
 
-// ── Connection history ───────────────────────────────
 #define MAX_CONN_EVENTS 10
 struct ConnEvent {
     uint32_t timestamp;
@@ -20,13 +19,12 @@ static ConnEvent _connHistory[MAX_CONN_EVENTS];
 static int  _connHistoryCount = 0;
 static bool _wasConnected     = false;
 
-// ── DNS latency ──────────────────────────────────────
 static uint32_t _lastDnsLatency = 0;
 
-// ── Nearby networks cache ────────────────────────────
 #define MAX_NEARBY 10
 struct NearbyAP {
     String  ssid;
+    String  bssid;
     int8_t  rssi;
     uint8_t channel;
     bool    isOpen;
@@ -36,7 +34,6 @@ static int       _nearbyCount    = 0;
 static uint32_t  _lastNearbyScan = 0;
 
 
-// ── DNS latency measurement ──────────────────────────
 static void measureDnsLatency() {
     if (!wifiConnected()) { _lastDnsLatency = 0; return; }
     IPAddress result;
@@ -46,7 +43,6 @@ static void measureDnsLatency() {
     _lastDnsLatency  = (err == 1) ? elapsed : 9999;
 }
 
-// ── Background scan for nearby networks ──────────────
 static void updateNearbyScan() {
     if (!wifiConnected()) return;
     if (millis() - _lastNearbyScan < 60000 && _lastNearbyScan != 0) return;
@@ -62,6 +58,7 @@ static void updateNearbyScan() {
     _nearbyCount = min(n, MAX_NEARBY);
     for (int i = 0; i < _nearbyCount; i++) {
         _nearbyAPs[i].ssid    = WiFi.SSID(i);
+        _nearbyAPs[i].bssid   = WiFi.BSSIDstr(i);
         _nearbyAPs[i].rssi    = WiFi.RSSI(i);
         _nearbyAPs[i].channel = WiFi.channel(i);
         _nearbyAPs[i].isOpen  = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
@@ -70,7 +67,6 @@ static void updateNearbyScan() {
     _lastNearbyScan = millis();
 }
 
-// ── Track connection events ──────────────────────────
 static void trackConnection() {
     bool now = wifiConnected();
     if (now != _wasConnected) {
@@ -84,7 +80,6 @@ static void trackConnection() {
     }
 }
 
-// ── Pause/Resume background tasks ───────────────────
 static void pauseBackground() {
     if (deauthDetectorActive) deauthDetectorEnd();
     netHealthEnd();
@@ -99,7 +94,6 @@ static void resumeBackground() {
     }
 }
 
-// ── WiFi security helpers ────────────────────────────
 static String getSecurityType() {
     wifi_ap_record_t info;
     if (esp_wifi_sta_get_ap_info(&info) != ESP_OK) return "UNKNOWN";
@@ -130,7 +124,6 @@ static String getCipherType() {
     }
 }
 
-// ── RSSI to classic 5-bar level ──────────────────────
 static int rssiBars(int32_t rssi) {
     if (rssi >= -50) return 5;
     if (rssi >= -60) return 4;
@@ -140,12 +133,11 @@ static int rssiBars(int32_t rssi) {
     return 0;
 }
 
-// ── Build 5-bar HTML ─────────────────────────────────
 static String buildSignalBars(int32_t rssi) {
     int bars = rssiBars(rssi);
     String html = "<div class='bars'>";
     for (int i = 1; i <= 5; i++) {
-        int h = 4 + (i * 1);  // heights: 7, 10, 13, 16, 19
+        int h = 4 + (i * 1);
         String color = (i <= bars) ?
             ((bars >= 4) ? "#0f0" : (bars >= 2) ? "#ff0" : "#f00") : "#222";
         html += "<div class='bar' style='height:" + String(h) +
@@ -156,7 +148,6 @@ static String buildSignalBars(int32_t rssi) {
 }
 
 
-// ── HTML header ──────────────────────────────────────
 static void sendHtmlHeader() {
     _server->sendContent(F("<!DOCTYPE html><html><head>"));
     _server->sendContent(F("<title>CLUNCHI ANALYZER</title>"));
@@ -169,7 +160,7 @@ static void sendHtmlHeader() {
     _server->sendContent(F(".subtitle{font-size:10px;color:#080;letter-spacing:3px;margin-bottom:20px;}"));
     _server->sendContent(F(".sec{background:#111;border:1px dashed #0f0;padding:14px;margin:12px 0;text-align:left;}"));
     _server->sendContent(F(".sec-h{font-size:9px;color:#080;letter-spacing:2px;margin-bottom:8px;display:block;}"));
-    _server->sendContent(F(".r{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dotted #040;font-size:12px;}"));
+    _server->sendContent(F(".r{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dotted #0a0;font-size:12px;}"));
     _server->sendContent(F(".r:last-child{border-bottom:none;}"));
     _server->sendContent(F(".v{color:#0f0;}"));
     _server->sendContent(F("table{width:100%;font-size:10px;border-collapse:collapse;margin-top:8px;}"));
@@ -177,34 +168,25 @@ static void sendHtmlHeader() {
     _server->sendContent(F("td{padding:3px 0;color:#0f0;}"));
     _server->sendContent(F(".warn{color:#f00;} .ok{color:#0f0;} .med{color:#ff0;}"));
 
-    // Classic signal bars
     _server->sendContent(F(".bar{width:4px;border-radius:1px;}"));
 
-    // Signal row with bars inline
-    _server->sendContent(F(".sig-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px dotted #040;font-size:12px;}"));
+    _server->sendContent(F(".sig-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px dotted #0a0;font-size:12px;}"));
     _server->sendContent(F(".sig-right{display:flex;align-items:center;}"));
     _server->sendContent(F(".sig-right span{display:inline-block;line-height:12px;}"));
     _server->sendContent(F(".bars{display:inline-flex;align-items:flex-end;gap:2px;margin-left:6px;transform:translateY(-1px);}"));
 
-    // Button
-    _server->sendContent(F(".btn{display:block;width:100%;padding:16px;margin:10px 0;background:#000;color:#0f0;border:2px solid #0f0;"));
-    _server->sendContent(F("font:bold 16px monospace;cursor:pointer;text-transform:uppercase;letter-spacing:2px;text-decoration:none;}"));
-    _server->sendContent(F(".btn:hover{background:#0f0;color:#000;}"));
-    _server->sendContent(F(".btn:active{background:#080;}"));
-
-    // Footer
-    _server->sendContent(F(".footer{font-size:9px;color:#040;margin-top:30px;letter-spacing:1px;opacity:0.7;}"));
-    _server->sendContent(F(".empty{font-size:10px;color:#040;padding:5px;}"));
+    _server->sendContent(F(".footer{font-size:9px;color:#0a0;margin-top:30px;letter-spacing:1px;}"));
+    _server->sendContent(F(".empty{font-size:10px;color:#0a0;padding:5px;}"));
+    _server->sendContent(F(".mac{font-size:8px;color:#0a0;letter-spacing:0.5px;}"));
     _server->sendContent(F(".alert-box{font-size:10px;color:#f00;padding:5px;margin-top:5px;border:1px solid #f00;}"));
 
     _server->sendContent(F("</style></head><body>"));
     _server->sendContent(F("<div class='box'>"));
     _server->sendContent(F("<h2>CLUNCHI</h2>"));
-    _server->sendContent(F("<div class='subtitle'>NETWORK ANALYZER v2.0</div>"));
+    _server->sendContent(F("<div class='subtitle'>NETWORK ANALYZER BETA v1.0</div>"));
 }
 
 
-// ── Main page handler ────────────────────────────────
 static void handleRoot() {
     pauseBackground();
     measureDnsLatency();
@@ -223,16 +205,14 @@ static void handleRoot() {
             "</span><span class='" + css + "'>" + value + "</span></div>");
     };
 
-    // ── WIFI STACK (moved to top, includes signal) ───
     int32_t rssi = wifiRSSI();
 
     _server->sendContent(F("<div class='sec'>"));
-    _server->sendContent(F("<span class='sec-h'>// WIFI STACK</span>"));
+    _server->sendContent(F("<span class='sec-h'>// WIFI</span>"));
     sendRow("SSID",    wifiCurrentSSID());
     sendRow("BSSID",   wifiBSSID());
     sendRow("Channel", String(wifiConnectedChannel()));
 
-    // RSSI row with classic bars
     _server->sendContent(
         "<div class='sig-row'><span>RSSI</span>"
         "<div class='sig-right'><span class='" +
@@ -243,7 +223,6 @@ static void handleRoot() {
     sendRow("Quality", wifiSignalLabel());
     _server->sendContent(F("</div>"));
 
-    // ── L2 SECURITY ──────────────────────────────────
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// L2 SECURITY</span>"));
 
@@ -272,7 +251,7 @@ static void handleRoot() {
             DeauthEvent& e = deauthLog[i];
             String rowCss  = e.isTargeted ? "warn" : "ok";
             _server->sendContent("<tr class='" + rowCss + "'><td>");
-            _server->sendContent(e.isDisassoc ? "DIS" : "DEA");
+            _server->sendContent(e.isDisassoc ? "DISS" : "DEAU");
             _server->sendContent("</td><td>");
             _server->sendContent(deauthMacToString(e.source).substring(9));
             _server->sendContent("</td><td>");
@@ -285,24 +264,37 @@ static void handleRoot() {
         }
         _server->sendContent(F("</table>"));
     } else {
-        _server->sendContent(F("<div class='empty'>NO MALICIOUS FRAMES DETECTED.</div>"));
+        _server->sendContent(F("<div class='empty'>NO DEAUTH FRAMES DETECTED.</div>"));
     }
     _server->sendContent(F("</div>"));
 
-    // ── L3 CONNECTIVITY ──────────────────────────────
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// L3 CONNECTIVITY</span>"));
+
+    String gradeStr = String(netGradeLabel(nhStats.grade));
+    bool   gradeBad = (nhStats.grade >= NetGrade::DEGRADED);
+    sendRow("Grade",    gradeStr, gradeBad);
     sendRow("Internet", netHealthIsUp ? "ONLINE" : "OFFLINE", !netHealthIsUp);
-    uint32_t lat = netHealthAvgLatency();
-    sendRow("Avg Latency", (lat > 0 ? String(lat) + " ms" : "---"), lat > 200);
+
+    if (nhStats.avgLatencyMs > 0) {
+        sendRow("Avg Latency", String(nhStats.avgLatencyMs) + " ms", nhStats.avgLatencyMs > 200);
+        sendRow("Min Latency", String(nhStats.minLatencyMs) + " ms");
+        sendRow("Max Latency", String(nhStats.maxLatencyMs) + " ms", nhStats.maxLatencyMs > 400);
+        sendRow("Jitter",      String(nhStats.jitterMs)     + " ms", nhStats.jitterMs > 50);
+    } else {
+        sendRow("Avg Latency", "---");
+    }
+
+    sendRow("Packet Loss", String(nhStats.lossPercent) + "%", nhStats.lossPercent > 10);
+
     sendRow("DNS Lookup",
             (_lastDnsLatency == 9999 ? "FAILED" :
             (_lastDnsLatency > 0     ? String(_lastDnsLatency) + " ms" : "---")),
             _lastDnsLatency > 500 || _lastDnsLatency == 9999);
+
     sendRow("Fail Count", String(netHealthConsecutiveFails), netHealthConsecutiveFails > 0);
     _server->sendContent(F("</div>"));
 
-    // ── WIFI SECURITY ────────────────────────────────
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// WIFI SECURITY</span>"));
     String secType = getSecurityType();
@@ -314,7 +306,6 @@ static void handleRoot() {
     }
     _server->sendContent(F("</div>"));
 
-    // ── NEARBY NETWORKS ──────────────────────────────
     if (_nearbyCount > 0) {
         _server->sendContent(F("<div class='sec'>"));
         _server->sendContent(F("<span class='sec-h'>// NEARBY NETWORKS</span>"));
@@ -322,7 +313,8 @@ static void handleRoot() {
         for (int i = 0; i < _nearbyCount; i++) {
             String rssiCss = (_nearbyAPs[i].rssi > -60) ? "ok" :
                              (_nearbyAPs[i].rssi > -75) ? "med" : "warn";
-            _server->sendContent("<tr><td>" + _nearbyAPs[i].ssid + "</td>");
+            _server->sendContent("<tr><td>" + _nearbyAPs[i].ssid +
+                "<br><span class='mac'>" + _nearbyAPs[i].bssid + "</span></td>");
             _server->sendContent("<td class='" + rssiCss + "'>" + String(_nearbyAPs[i].rssi) + "</td>");
             _server->sendContent("<td>" + String(_nearbyAPs[i].channel) + "</td>");
             _server->sendContent(String("<td>") +
@@ -333,7 +325,6 @@ static void handleRoot() {
         _server->sendContent(F("</div>"));
     }
 
-    // ── IP CONFIG ────────────────────────────────────
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// IP CONFIG</span>"));
     sendRow("Local IP",  wifiIP());
@@ -344,7 +335,6 @@ static void handleRoot() {
     sendRow("Hostname",  wifiHostname());
     _server->sendContent(F("</div>"));
 
-    // ── CONNECTION HISTORY ───────────────────────────
     if (_connHistoryCount > 0) {
         _server->sendContent(F("<div class='sec'>"));
         _server->sendContent(F("<span class='sec-h'>// CONNECTION HISTORY</span>"));
@@ -364,7 +354,6 @@ static void handleRoot() {
         _server->sendContent(F("</div>"));
     }
 
-    // ── HARDWARE ─────────────────────────────────────
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// HARDWARE</span>"));
     sendRow("Free Heap",   String(ESP.getFreeHeap()    / 1024) + " KB");
@@ -377,7 +366,6 @@ static void handleRoot() {
     sendRow("Uptime",      wifiUptimeFormatted());
     _server->sendContent(F("</div>"));
 
-    // ── Refresh + footer ─────────────────────────────
     _server->sendContent(F("<div class='footer'>CLUNCHI ANALYZER BETA v1.0</div>"));
 
     _server->sendContent(F("</div></body></html>"));
@@ -388,24 +376,28 @@ static void handleRoot() {
 }
 
 
-// ── JSON API ─────────────────────────────────────────
 static void handleAPI() {
     String json = "{";
-    json += "\"rssi\":"          + String(wifiRSSI())             + ",";
-    json += "\"signal_pct\":"    + String(wifiSignalPercent())    + ",";
-    json += "\"signal_bars\":"   + String(rssiBars(wifiRSSI()))   + ",";
-    json += "\"ssid\":\""        + wifiCurrentSSID()              + "\",";
-    json += "\"ip\":\""          + wifiIP()                       + "\",";
-    json += "\"gateway\":\""     + wifiGatewayIP()                + "\",";
+    json += "\"rssi\":"          + String(wifiRSSI())                      + ",";
+    json += "\"signal_pct\":"    + String(wifiSignalPercent())             + ",";
+    json += "\"signal_bars\":"   + String(rssiBars(wifiRSSI()))            + ",";
+    json += "\"ssid\":\""        + wifiCurrentSSID()                       + "\",";
+    json += "\"ip\":\""          + wifiIP()                                + "\",";
+    json += "\"gateway\":\""     + wifiGatewayIP()                         + "\",";
     json += "\"online\":"        + String(netHealthIsUp ? "true" : "false") + ",";
-    json += "\"latency\":"       + String(netHealthAvgLatency())  + ",";
-    json += "\"dns_latency\":"   + String(_lastDnsLatency)        + ",";
-    json += "\"deauth_count\":"  + String(deauthTotalCount)       + ",";
-    json += "\"threat_score\":"  + String(deauthThreatScore())    + ",";
+    json += "\"grade\":\""       + String(netGradeLabel(nhStats.grade))    + "\",";
+    json += "\"avg_latency\":"   + String(nhStats.avgLatencyMs)            + ",";
+    json += "\"min_latency\":"   + String(nhStats.minLatencyMs)            + ",";
+    json += "\"max_latency\":"   + String(nhStats.maxLatencyMs)            + ",";
+    json += "\"jitter\":"        + String(nhStats.jitterMs)                + ",";
+    json += "\"loss_pct\":"      + String(nhStats.lossPercent)             + ",";
+    json += "\"dns_latency\":"   + String(_lastDnsLatency)                 + ",";
+    json += "\"deauth_count\":"  + String(deauthTotalCount)                + ",";
+    json += "\"threat_score\":"  + String(deauthThreatScore())             + ",";
     json += "\"under_attack\":"  + String(deauthUnderAttack() ? "true" : "false") + ",";
-    json += "\"uptime\":"        + String(wifiConnUptime())       + ",";
-    json += "\"heap\":"          + String(ESP.getFreeHeap())      + ",";
-    json += "\"security\":\""    + getSecurityType()              + "\"";
+    json += "\"uptime\":"        + String(wifiConnUptime())                + ",";
+    json += "\"heap\":"          + String(ESP.getFreeHeap())               + ",";
+    json += "\"security\":\""    + getSecurityType()                       + "\"";
     json += "}";
 
     _server->sendHeader("Access-Control-Allow-Origin", "*");
@@ -413,7 +405,6 @@ static void handleAPI() {
 }
 
 
-// ── Lifecycle ────────────────────────────────────────
 void dashboardBegin() {
     if (_active) return;
     _server = new WebServer(80);
@@ -422,6 +413,9 @@ void dashboardBegin() {
     _server->begin();
     _active       = true;
     _wasConnected = wifiConnected();
+    _lastNearbyScan = 0;
+    _nearbyCount    = 0;
+    WiFi.scanNetworks(true, false, true);
 }
 
 void dashboardEnd() {

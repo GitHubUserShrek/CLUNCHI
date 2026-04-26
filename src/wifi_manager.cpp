@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════════
-//  wifi_manager.cpp — WiFi radio + connection management
-// ═══════════════════════════════════════════════════════
-
 #include "wifi_manager.h"
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -12,14 +8,12 @@
 #include "esp_wifi.h"
 #include "portal.h"
 
-// ── Public globals ───────────────────────────────────
 APResult     scanResults[20];
 int          scanCount    = 0;
 bool         scanActive   = false;
 ConnectState connectState = CONN_IDLE;
 String       connectedSSID = "";
 
-// ── Private state ────────────────────────────────────
 static bool     _wifiInitialised      = false;
 static bool     _connected            = false;
 static uint32_t _scanStartTime        = 0;
@@ -29,7 +23,6 @@ static uint32_t _connEstablishedTime  = 0;
 static bool _justConnectedFlag    = false;
 static bool _justDisconnectedFlag = false;
 
-// Portal state
 static DNSServer        dnsServer;
 static AsyncWebServer*  portalServer        = nullptr;
 static Preferences      portalPrefs;
@@ -40,7 +33,6 @@ static String           portalPendingSSID   = "";
 static String           portalPendingPass   = "";
 
 
-// ── One-shot flag accessors ──────────────────────────
 bool wifiJustConnected() {
     if (_justConnectedFlag) { _justConnectedFlag = false; return true; }
     return false;
@@ -51,8 +43,6 @@ bool wifiJustDisconnected() {
     return false;
 }
 
-
-// ── WiFi event handler ───────────────────────────────
 static void wifiEventHandler(WiFiEvent_t event) {
     switch (event) {
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
@@ -76,8 +66,6 @@ static void wifiEventHandler(WiFiEvent_t event) {
     }
 }
 
-
-// ── Radio lifecycle ──────────────────────────────────
 void wifiBegin() {
     if (_wifiInitialised || !WIFI_ENABLED) return;
 
@@ -107,8 +95,6 @@ void wifiDeinit() {
 
 bool isWifiInitialised() { return _wifiInitialised; }
 
-
-// ── Connection ───────────────────────────────────────
 void wifiConnect(const char* ssid) {
     if (!_wifiInitialised) wifiBegin();
 
@@ -142,8 +128,6 @@ void wifiDisconnect() {
     _connEstablishedTime = 0;
 }
 
-
-// ── Scanning ─────────────────────────────────────────
 void wifiStartScan() {
     if (!_wifiInitialised) wifiBegin();
     if (scanActive) return;
@@ -166,8 +150,6 @@ void wifiCancelScan() {
 
 uint32_t wifiScanStartTime() { return _scanStartTime; }
 
-
-// ── Main update loop ─────────────────────────────────
 void wifiUpdate() {
     if (!_wifiInitialised && !scanActive) return;
 
@@ -217,8 +199,6 @@ void wifiUpdate() {
     }
 }
 
-
-// ── Captive portal ───────────────────────────────────
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
     bool canHandle(AsyncWebServerRequest *request) const override {
@@ -316,8 +296,6 @@ void wifiProcessPortal() {
     }
 }
 
-
-// ── Accessors ────────────────────────────────────────
 bool     wifiIsPortalActive()   { return portalActive; }
 bool     wifiConnected()        { return _connected; }
 String   wifiIP()               { return _connected ? WiFi.localIP().toString()    : "0.0.0.0"; }
@@ -351,7 +329,6 @@ void wifiClearPortalCredentials() {
     portalPrefs.end();
 }
 
-// ── Extended network info ────────────────────────────
 float wifiTxPower() {
     int8_t pwr;
     esp_wifi_get_max_tx_power(&pwr);

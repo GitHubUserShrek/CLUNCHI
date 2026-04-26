@@ -1,17 +1,6 @@
 #pragma once
 #include <Arduino.h>
 
-// ═══════════════════════════════════════════════════════
-//  menu.h — Menu UI system
-//
-//  OWNS: menu navigation, menu rendering, menu actions
-//  READS: touch globals (raw state, not events)
-//  EXPOSES: menuWantsRadar() flag for main.cpp
-//
-//  Internal action/draw functions are NOT in this header.
-//  They live in menu.cpp only.
-// ═══════════════════════════════════════════════════════
-
 enum MenuMode {
     MENU_OFF,
     MENU_MAIN,
@@ -32,6 +21,6 @@ void menuUpdate();
 void enterMenu();
 void exitMenu();
 bool isMenuActive();
-bool menuWantsRadar();   // true ONCE after user selects radar
+bool menuWantsRadar();  
 void showConfirm(const char* line1, const char* line2,
                  MenuMode returnTo);

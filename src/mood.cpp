@@ -9,16 +9,13 @@
 #include "net_health.h"
 #include <Preferences.h>
 
-// ── External objects (owned by main.cpp) ─────────────
 extern Audio     audio;
 extern Animation animation;
 
-// ── Public state ─────────────────────────────────────
 Mood     mood            = NEUTRAL;
 uint32_t moodChangeTime  = 0;
 uint32_t lastInteraction = 0;
 
-// ── Private state ────────────────────────────────────
 static bool     _wasConnected   = false;
 static bool     _wasNetDown     = false;
 static bool     _radarActive    = false;
@@ -27,7 +24,6 @@ static uint32_t _lastAlertTime  = 0;
 static uint32_t _sleepTimeoutMs = 30000;
 static uint32_t _lastSettingsCheck = 0;
 
-// ── Helpers ──────────────────────────────────────────
 bool isRadarActive() { return _radarActive; }
 
 Mood baseMood() {
@@ -57,10 +53,6 @@ void moodBegin() {
     Serial.println("[Mood] State sponsored machine initialized.");
 }
 
-// ─────────────────────────────────────────────────────
-//  Reaction helpers
-// ─────────────────────────────────────────────────────
-
 static void _setMood(Mood m) {
     if (mood != m) {
         animation.onMoodChange();
@@ -72,6 +64,7 @@ static void _setMood(Mood m) {
 static void _reactJazzed() {
     _setMood(JAZZED);
     audio.jazzed();
+    Serial.println("[Mood] MMM BOP");
     if (wifiConnected()) wifiPrintInfo();
     lastInteraction = millis();
 }
@@ -117,10 +110,6 @@ static void _reactCurious() {
         wifiStartScan();
     }
 }
-
-// ─────────────────────────────────────────────────────
-//  Touch event reactions
-// ─────────────────────────────────────────────────────
 
 static void _handleTouchEvent(TouchEvent event, uint32_t now) {
     if (event == TouchEvent::NONE) return;
@@ -177,6 +166,7 @@ static void _handleTouchEvent(TouchEvent event, uint32_t now) {
         } else {
             _setMood(HAPPY);
             audio.happy();
+            Serial.println("[Mood] *Thunderous applause*");
             animation.triggerBlink();
         }
         break;
@@ -189,10 +179,6 @@ static void _handleTouchEvent(TouchEvent event, uint32_t now) {
         break;
     }
 }
-
-// ─────────────────────────────────────────────────────
-//  Radar mode
-// ─────────────────────────────────────────────────────
 
 void triggerRadar() {
     _radarActive    = true;
@@ -280,10 +266,6 @@ static void _updateRadar(uint32_t now) {
     }
 }
 
-// ─────────────────────────────────────────────────────
-//  Network state reactions
-// ─────────────────────────────────────────────────────
-
 static void _updateNetworkState(uint32_t now, bool connected) {
     if (connected != _wasConnected) {
         if (!connected && deauthHasRecentAlert(15000)) {
@@ -327,10 +309,6 @@ static void _updateNetworkState(uint32_t now, bool connected) {
         if (mood != SLEEPY) _reactJazzed();
     }
 }
-
-// ─────────────────────────────────────────────────────
-//  Mood decay / timeouts
-// ─────────────────────────────────────────────────────
 
 static void _updateMoodDecay(uint32_t now, bool connected) {
     uint32_t idleTime = now - lastInteraction;
@@ -376,10 +354,6 @@ static void _updateMoodDecay(uint32_t now, bool connected) {
     }
 }
 
-// ─────────────────────────────────────────────────────
-//  Idle personality
-// ─────────────────────────────────────────────────────
-
 static void _updateIdlePersonality(uint32_t now, bool connected) {
     uint32_t idleTime = now - lastInteraction;
 
@@ -399,10 +373,6 @@ static void _updateIdlePersonality(uint32_t now, bool connected) {
     }
 }
 
-// ─────────────────────────────────────────────────────
-//  Settings reload
-// ─────────────────────────────────────────────────────
-
 static void _reloadSettings(uint32_t now) {
     if (isMenuActive()) return;
     if (now - _lastSettingsCheck < 10000) return;
@@ -415,10 +385,6 @@ static void _reloadSettings(uint32_t now) {
         prefs.end();
     }
 }
-
-// ─────────────────────────────────────────────────────
-//  Main update
-// ─────────────────────────────────────────────────────
 
 void moodUpdate(TouchEvent event) {
     if (wifiIsPortalActive()) return;
