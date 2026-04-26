@@ -62,7 +62,7 @@ static void handlePeriodicLog(uint32_t now) {
 void setup() {
     Serial.begin(115200);
     delay(900);
-    Serial.println("\n[System] CLUNCHI V2 Booting...");
+    Serial.println("\n[System] CLUNCHI BETA V1.0 Booting...");
 
     Preferences nvsInit;
     nvsInit.begin("clunchi", false); nvsInit.end();

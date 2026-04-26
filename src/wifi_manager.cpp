@@ -250,7 +250,8 @@ void wifiStartPortal() {
             [](AsyncWebServerRequest *request, uint8_t *data,
                size_t len, size_t index, size_t total) {
                 JsonDocument doc;
-                if (!deserializeJson(doc, (const char*)data)) {
+                DeserializationError error = deserializeJson(doc, (const char*)data, len);
+                if (!error) {
                     portalPendingSSID   = doc["ssid"].as<String>();
                     portalPendingPass   = doc["password"].as<String>();
                     portalSaveAndReboot = true;
