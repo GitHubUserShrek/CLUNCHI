@@ -82,10 +82,16 @@ const char PORTAL_HTML[] PROGMEM = R"rawliteral(
 
         document.getElementById('loader').style.display = 'flex';
 
+        // FIX: Send JSON instead of form data
+        const payload = {
+            ssid: s,
+            password: p
+        };
+
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/save');
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        xhr.send('s=' + encodeURIComponent(s) + '&p=' + encodeURIComponent(p));
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify(payload));
     }
 
     function clearWiFi() {
