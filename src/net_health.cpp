@@ -3,9 +3,6 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-// ─────────────────────────────────────────────
-//  DNS probe targets
-// ─────────────────────────────────────────────
 struct ProbeTarget {
     const char* host;
     const char* label;
@@ -17,26 +14,21 @@ static const ProbeTarget TARGETS[NH_TARGET_COUNT] = {
     { "208.67.222.222",  "OpenDNS"    },
 };
 
-// Minimal DNS query for "ping.test" A record
-// Will get NXDOMAIN — we only care about round trip time
 static const uint8_t DNS_QUERY[] = {
-    0x00, 0x01,  // Transaction ID
-    0x01, 0x00,  // Flags: standard query, recursion desired
-    0x00, 0x01,  // Questions: 1
-    0x00, 0x00,  // Answer RRs
-    0x00, 0x00,  // Authority RRs
-    0x00, 0x00,  // Additional RRs
+    0x00, 0x01, 
+    0x01, 0x00,  
+    0x00, 0x01, 
+    0x00, 0x00,  
+    0x00, 0x00,  
+    0x00, 0x00,  
     0x04, 'p','i','n','g',
     0x04, 't','e','s','t',
-    0x00,        // root
-    0x00, 0x01,  // QTYPE: A
-    0x00, 0x01   // QCLASS: IN
+    0x00,        
+    0x00, 0x01,  
+    0x00, 0x01   
 };
 static const size_t DNS_QUERY_LEN = sizeof(DNS_QUERY);
 
-// ─────────────────────────────────────────────
-//  State machine
-// ─────────────────────────────────────────────
 enum class ProbeState : uint8_t {
     IDLE,
     SENDING,
@@ -45,23 +37,16 @@ enum class ProbeState : uint8_t {
     DONE
 };
 
-// ─────────────────────────────────────────────
-//  Public globals
-// ─────────────────────────────────────────────
 PingEntry nhHistory[NH_HISTORY_SIZE];
 uint8_t   nhHistoryCount = 0;
 uint8_t   nhHistoryHead  = 0;
 NetStats  nhStats        = {};
 bool      nhActive       = false;
 
-// Backward compat
 bool      netHealthIsUp             = true;
 int       netHealthConsecutiveFails = 0;
 uint32_t  netHealthLastPing         = 0;
 
-// ─────────────────────────────────────────────
-//  Private state
-// ─────────────────────────────────────────────
 static ProbeState  _state          = ProbeState::IDLE;
 static uint32_t    _lastRoundMs    = 0;
 static uint8_t     _currentTarget  = 0;
@@ -70,9 +55,6 @@ static uint32_t    _probeStartMs   = 0;
 static uint8_t     _betterCount    = 0;
 static NetGrade    _pendingGrade   = NetGrade::UNKNOWN;
 
-// ─────────────────────────────────────────────
-//  Helpers
-// ─────────────────────────────────────────────
 const char* netGradeLabel(NetGrade g) {
     switch (g) {
         case NetGrade::EXCELLENT: return "EXCELLENT";
@@ -130,18 +112,27 @@ static void _recalcStats() {
 
     uint32_t avg = (succCnt > 0) ? (totalMs / succCnt) : 0;
 
-    // Jitter: mean absolute deviation
     uint32_t jitter = 0;
     if (succCnt > 1) {
+        uint32_t prevLatency = 0;
         uint32_t devSum = 0;
+        uint8_t  pairs = 0;
+        bool     hasPrev = false;
+
         _forEachEntry([&](const PingEntry& e) {
             if (e.success) {
-                devSum += (e.latencyMs > avg)
-                          ? (e.latencyMs - avg)
-                          : (avg - e.latencyMs);
+                if (hasPrev) {
+                    devSum += (e.latencyMs > prevLatency)
+                            ? (e.latencyMs - prevLatency)
+                            : (prevLatency - e.latencyMs);
+                    pairs++;
+                }
+                prevLatency = e.latencyMs;
+                hasPrev = true;
             }
         });
-        jitter = devSum / succCnt;
+
+        jitter = (pairs > 0) ? (devSum / pairs) : 0;
     }
 
     uint8_t lossPct = (total > 0)
@@ -155,7 +146,6 @@ static void _recalcStats() {
     nhStats.lossPercent  = lossPct;
     nhStats.lastProbeMs  = millis();
 
-    // ── Raw grade ────────────────────────────────────────────
     NetGrade raw;
     if (succCnt == 0) {
         raw = NetGrade::DOWN;
@@ -169,7 +159,6 @@ static void _recalcStats() {
         raw = NetGrade::POOR;
     }
 
-    // ── Hysteresis: instant worsen, slow improve ─────────────
     uint8_t curOrd = (uint8_t)nhStats.grade;
     uint8_t rawOrd = (uint8_t)raw;
 
@@ -185,16 +174,13 @@ static void _recalcStats() {
         }
     }
 
-    // ── Update backward-compat globals ───────────────────────
     netHealthIsUp = (nhStats.grade != NetGrade::DOWN);
     netHealthLastPing = nhStats.lastProbeMs;
 
     if (netHealthIsUp) {
         netHealthConsecutiveFails = 0;
     } else {
-        // Count consecutive fails from tail of history
         int fails = 0;
-        // Walk backward through ring buffer
         for (int i = nhHistoryCount - 1; i >= 0; i--) {
             uint8_t idx = (nhHistoryCount < NH_HISTORY_SIZE)
                           ? i
@@ -215,9 +201,6 @@ static void _sendProbe() {
     _probeStartMs = millis();
 }
 
-// ─────────────────────────────────────────────
-//  Public API
-// ─────────────────────────────────────────────
 void netHealthBegin() {
     if (nhActive) return;
     nhActive        = true;
@@ -247,7 +230,6 @@ void netHealthEnd() {
 void netHealthUpdate() {
     if (!nhActive) return;
 
-    // If WiFi drops mid-probe, clean up
     if (!wifiConnected()) {
         if (_state != ProbeState::IDLE) {
             _udp.stop();
@@ -260,7 +242,6 @@ void netHealthUpdate() {
 
     switch (_state) {
 
-    // ── Wait for next check interval ─────────────────────────
     case ProbeState::IDLE:
         if (now - _lastRoundMs >= NH_CHECK_INTERVAL_MS) {
             _lastRoundMs   = now;
@@ -269,7 +250,6 @@ void netHealthUpdate() {
         }
         break;
 
-    // ── Send UDP DNS query ───────────────────────────────────
     case ProbeState::SENDING:
         _sendProbe();
         _state = ProbeState::WAITING;
@@ -277,7 +257,6 @@ void netHealthUpdate() {
                       TARGETS[_currentTarget].label);
         break;
 
-    // ── Poll for reply (non-blocking) ────────────────────────
     case ProbeState::WAITING: {
         uint32_t elapsed = now - _probeStartMs;
         bool timedOut = (elapsed >= NH_PROBE_TIMEOUT_MS);
@@ -285,19 +264,18 @@ void netHealthUpdate() {
         int packetSize = _udp.parsePacket();
 
         if (packetSize == 0 && !timedOut) {
-            break;  // still waiting — return immediately
+            break;  
         }
 
         bool success = false;
         uint32_t latencyMs = elapsed;
 
         if (packetSize > 0) {
-            // Validate DNS reply header
             uint8_t buf[4];
             int rd = _udp.read(buf, sizeof(buf));
             if (rd >= 4 &&
-                buf[0] == 0x00 && buf[1] == 0x01 &&  // our TX ID
-                (buf[2] & 0x80)) {                    // QR bit = response
+                buf[0] == 0x00 && buf[1] == 0x01 &&  
+                (buf[2] & 0x80)) {                    
                 success = true;
             }
         }
@@ -314,7 +292,6 @@ void netHealthUpdate() {
         break;
     }
 
-    // ── Move to next target or finish round ──────────────────
     case ProbeState::NEXT_TARGET:
         _currentTarget++;
         if (_currentTarget < NH_TARGET_COUNT) {
@@ -324,7 +301,6 @@ void netHealthUpdate() {
         }
         break;
 
-    // ── Recalc stats and go idle ─────────────────────────────
     case ProbeState::DONE:
         _recalcStats();
         _state = ProbeState::IDLE;
@@ -372,7 +348,6 @@ void netHealthPrintStatus() {
         });
     }
 
-    // Compat globals
     Serial.printf("[NetHealth]  (compat) isUp=%d fails=%d\n",
                   netHealthIsUp, netHealthConsecutiveFails);
     Serial.println("[NetHealth] ==========================================");

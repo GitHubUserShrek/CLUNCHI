@@ -1,6 +1,5 @@
 #include "animation.h"
 
-// Smooth lerp helper — eases current toward target
 static float lerpTo(float current, float target, float speed) {
     float diff = target - current;
     if (fabs(diff) < 0.1f) return target;
@@ -15,7 +14,6 @@ void Animation::begin() {
 void Animation::update(Mood currentMood) {
     uint32_t now = millis();
 
-    // ── Blink timing ─────────────────────────────────────────────
     uint32_t blinkMin = 3000, blinkMax = 7000;
     if (currentMood == VIGILANT) { blinkMin = 8000; blinkMax = 15000; }
     if (currentMood == ENRAGED)  { blinkMin = 6000; blinkMax = 12000; }
@@ -32,7 +30,6 @@ void Animation::update(Mood currentMood) {
         blinkPhase_ = 0;
     }
 
-    // ── Timed eye effects ────────────────────────────────────────
     if (showHeartEyes_ && now > heartEyesEndTime_) {
         showHeartEyes_ = false;
     }
@@ -46,12 +43,10 @@ void Animation::update(Mood currentMood) {
         dribbleVelocity_ = 0;
     }
 
-    // ── Spiral rotation ──────────────────────────────────────────
     if (showSpiralEyes_) {
         spiralAngle_ = fmod(now / 200.0f, 2.0f * PI);
     }
 
-    // ── Dribble physics ──────────────────────────────────────────
     if (isDribbling_) {
         const float gravity = 0.6f;
         const float damping = 0.85f;
@@ -67,8 +62,6 @@ void Animation::update(Mood currentMood) {
 
         dribbleBounce_ = dribblePos_;
 
-        // ── Scatter: drift back to center ────────────────────────
-        // Speed increases as we get closer (smooth ease-out)
         const float reformSpeed = 0.08f;
 
         scatterLeftEyeX_  = lerpTo(scatterLeftEyeX_,  0, reformSpeed);
@@ -78,13 +71,11 @@ void Animation::update(Mood currentMood) {
         scatterMouthX_    = lerpTo(scatterMouthX_,     0, reformSpeed);
         scatterMouthY_    = lerpTo(scatterMouthY_,     0, reformSpeed);
     } else {
-        // Not dribbling — snap everything to center
         scatterLeftEyeX_  = 0; scatterLeftEyeY_  = 0;
         scatterRightEyeX_ = 0; scatterRightEyeY_ = 0;
         scatterMouthX_    = 0; scatterMouthY_     = 0;
     }
 
-    // ── Pupil position ───────────────────────────────────────────
     if (currentMood == CURIOUS) {
         pupilX_ = 3;
         pupilY_ = -1;
@@ -100,13 +91,11 @@ void Animation::update(Mood currentMood) {
         lastLookTime_ = now;
     }
 
-    // ── Squish decay ─────────────────────────────────────────────
     if (squishY_ > 0) {
         squishY_ -= 0.8f;
         if (squishY_ < 0) squishY_ = 0;
     }
 
-    // ── Bounce ───────────────────────────────────────────────────
     if (isDribbling_) {
         bounceY_ = dribbleBounce_;
     }
@@ -135,7 +124,6 @@ void Animation::update(Mood currentMood) {
         bounceY_ = 0;
     }
 
-    // ── Breathing ────────────────────────────────────────────────
     if (currentMood == SLEEPY) {
         breathY_ = sin(now / 1000.0f) * 2.0f;
     } else if (currentMood == VIGILANT) {
@@ -144,7 +132,6 @@ void Animation::update(Mood currentMood) {
         breathY_ = 0;
     }
 
-    // ── Head tilt ────────────────────────────────────────────────
     if (isDribbling_) {
         headTilt_ = dribbleBounce_ * 0.5f;
     }
@@ -160,18 +147,10 @@ void Animation::update(Mood currentMood) {
 }
 
 void Animation::onMoodChange() {
-    // Clear all mood-triggered visual effects
-    // Preserves touch-driven state (dribble, squish, bounce)
     showHeartEyes_  = false;
     showSpiralEyes_ = false;
     headTilt_       = 0;
     breathY_        = 0;
-
-    // Future-proof: add any new mood-triggered effects here
-    // e.g.:
-    // showCheekBlush_ = false;
-    // showSweatDrop_  = false;
-    // tongueOut_      = false;
 }
 
 void Animation::triggerBlink() {
@@ -198,7 +177,6 @@ void Animation::triggerDribble(uint32_t duration) {
     dribbleEndTime_ = millis() + duration;
     dribblePos_ = 0;
     dribbleVelocity_ = 0;
-    // Clear scatter positions
     scatterLeftEyeX_  = 0; scatterLeftEyeY_  = 0;
     scatterRightEyeX_ = 0; scatterRightEyeY_ = 0;
     scatterMouthX_    = 0; scatterMouthY_     = 0;
@@ -208,11 +186,8 @@ void Animation::triggerDribble(uint32_t duration) {
 void Animation::triggerDribbleHit() {
     if (!isDribbling_) return;
 
-    // Slam downward
     dribbleVelocity_ = 6.0f;
 
-    // Scatter eyes and mouth to random positions
-    // Range: -12 to +12 pixels X, -8 to +8 pixels Y
     scatterLeftEyeX_  = random(-12, 13);
     scatterLeftEyeY_  = random(-8, 9);
     scatterRightEyeX_ = random(-12, 13);
@@ -220,7 +195,6 @@ void Animation::triggerDribbleHit() {
     scatterMouthX_    = random(-10, 11);
     scatterMouthY_    = random(-6, 7);
 
-    // Extend timers
     dribbleEndTime_ = millis() + 5000;
     spiralEyesEndTime_ = dribbleEndTime_;
 

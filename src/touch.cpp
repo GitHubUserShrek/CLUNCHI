@@ -1,18 +1,9 @@
-// ═══════════════════════════════════════════════════════
-//  touch.cpp — Touch input + event detection
-//
-//  ONLY reads the touch pin and classifies input.
-//  Does NOT set mood, trigger animations, or play sounds.
-//  Emits TouchEvent for mood.cpp to consume.
-// ═══════════════════════════════════════════════════════
-
 #include "touch.h"
 #include "config.h"
-#include "animation.h"       // NEW
+#include "animation.h"       
 
-extern Animation animation;  // NEW
+extern Animation animation;  
 
-// ── Raw state ────────────────────────────────────────
 bool          isTouched         = false;
 bool          touchJustPressed  = false;
 bool          touchJustReleased = false;
@@ -21,7 +12,6 @@ bool          touchWasLongPress = false;
 unsigned long touchDownTime     = 0;
 unsigned long touchUpTime       = 0;
 
-// ── Internal state ───────────────────────────────────
 static int           touchBaseline_  = 0;
 static int           tapCount_       = 0;
 static uint32_t      firstTapTime_   = 0;
@@ -29,7 +19,6 @@ static bool          dribbleActive_  = false;
 static uint32_t      lastDribbleTap_ = 0;
 static TouchEvent    pendingEvent_   = TouchEvent::NONE;
 
-// ── Diagnostics ──────────────────────────────────────
 int  readTouchRaw()     { return analogRead(PIN_TOUCH); }
 int  getTouchBaseline() { return touchBaseline_; }
 bool isDribbleActive()  { return dribbleActive_ || animation.isDribbling(); }
@@ -56,14 +45,12 @@ void resetTapCount() {
     dribbleActive_ = false;
 }
 
-// ── Returns pending event and clears it ──────────────
 TouchEvent consumeTouchEvent() {
     TouchEvent ev = pendingEvent_;
     pendingEvent_ = TouchEvent::NONE;
     return ev;
 }
 
-// ── Pin reading + edge detection ─────────────────────
 void handleTouch() {
     bool touched = readTouch();
     uint32_t now = millis();
@@ -90,11 +77,9 @@ void handleTouch() {
     isTouched = touched;
 }
 
-// ── Tap classification + event emission ──────────────
 void evaluateTaps() {
     uint32_t now = millis();
 
-    // ── Dribble mode ─────────────────────────────────
     if (dribbleActive_) {
         if (touchJustPressed) {
             lastDribbleTap_ = now;
@@ -110,7 +95,6 @@ void evaluateTaps() {
         return;
     }
 
-    // ── Register taps ────────────────────────────────
     if (touchJustPressed) {
         if (tapCount_ == 0) firstTapTime_ = now;
         tapCount_++;
@@ -119,9 +103,6 @@ void evaluateTaps() {
             firstTapTime_ = now;
         }
 
-
-
-        // Instant dribble on 10th tap
         if (tapCount_ >= 10 && !dribbleActive_) {
             dribbleActive_ = true;
             lastDribbleTap_ = now;
@@ -132,13 +113,11 @@ void evaluateTaps() {
         }
     }
 
-    // ── Long press ───────────────────────────────────
     if (longTouchActive && tapCount_ > 0) {
         tapCount_ = 0;
         pendingEvent_ = TouchEvent::LONG_PRESS;
     }
 
-    // ── Evaluate after release (for counts < 10) ─────
     if (!isTouched && tapCount_ > 0 && (now - touchUpTime > 500)) {
 
         if (tapCount_ >= 6) {
