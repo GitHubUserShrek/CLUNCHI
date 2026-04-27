@@ -11,6 +11,8 @@ public:
     void toggleMute();
     bool isMuted() const { return muted_; }
 
+    void saveSettings();
+
     void beep(int freq, uint32_t duration);
 
     void chirp();          

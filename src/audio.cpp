@@ -1,10 +1,13 @@
 #include "audio.h"
 #include <Preferences.h>
 
+static bool _nvsLoaded = false;
+
 void Audio::begin() {
-        ledcSetup(TONE_CHANNEL, 2000, 8);
-        ledcAttachPin(PIN_SPEAKER, TONE_CHANNEL);
+    ledcSetup(TONE_CHANNEL, 2000, 8);
+    ledcAttachPin(PIN_SPEAKER, TONE_CHANNEL);
     stop();
+
 
     Preferences prefs;
     if (prefs.begin("clunchi", true)) {
@@ -14,15 +17,16 @@ void Audio::begin() {
         prefs.end();
     }
     if (muted_) volume_ = 0;
+    _nvsLoaded = true;
 }
 
 void Audio::tone(int freq) {
-        ledcWriteTone(TONE_CHANNEL, freq);
-        ledcWrite(TONE_CHANNEL, volume_);
+    ledcWriteTone(TONE_CHANNEL, freq);
+    ledcWrite(TONE_CHANNEL, volume_);
 }
 
 void Audio::stop() {
-        ledcWrite(TONE_CHANNEL, 0);
+    ledcWrite(TONE_CHANNEL, 0);
 }
 
 void Audio::beep(int freq, uint32_t duration) {
@@ -31,38 +35,31 @@ void Audio::beep(int freq, uint32_t duration) {
     stop();
 }
 
-void Audio::setVolume(uint8_t vol) {
-    volume_ = vol;
-    if (vol > 0) muted_ = false;
-
+void Audio::saveSettings() {
     Preferences prefs;
     if (prefs.begin("clunchi", false)) {
-        prefs.putUChar("volume", vol);
-        prefs.putBool("muted", false);
+        prefs.putUChar("volume", muted_ ? savedVolume_ : volume_);
+        prefs.putUChar("savedVol", savedVolume_);
+        prefs.putBool("muted", muted_);
         prefs.end();
+        Serial.println("[Audio] Settings saved to NVS.");
     }
 }
 
+void Audio::setVolume(uint8_t vol) {
+    volume_ = vol;
+    if (vol > 0) muted_ = false;
+}
+
 void Audio::toggleMute() {
-    Preferences prefs;
     if (muted_) {
         muted_ = false;
         volume_ = savedVolume_;
-        if (prefs.begin("clunchi", false)) {
-            prefs.putBool("muted", false);
-            prefs.putUChar("volume", volume_);
-            prefs.end();
-        }
         Serial.println("[Audio] Unmuted");
     } else {
         savedVolume_ = volume_;
         muted_ = true;
         volume_ = 0;
-        if (prefs.begin("clunchi", false)) {
-            prefs.putBool("muted", true);
-            prefs.putUChar("savedVol", savedVolume_);
-            prefs.end();
-        }
         Serial.println("[Audio] Muted");
     }
 }

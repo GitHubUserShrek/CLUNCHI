@@ -32,6 +32,10 @@ static bool             portalShouldClear   = false;
 static String           portalPendingSSID   = "";
 static String           portalPendingPass   = "";
 
+static String _cachedSSID    = "";
+static bool   _ssidCached    = false;
+
+static String _portalStatusJSON = "";
 
 bool wifiJustConnected() {
     if (_justConnectedFlag) { _justConnectedFlag = false; return true; }
@@ -41,6 +45,11 @@ bool wifiJustConnected() {
 bool wifiJustDisconnected() {
     if (_justDisconnectedFlag) { _justDisconnectedFlag = false; return true; }
     return false;
+}
+
+static void wifiInvalidateSSIDCache() {
+    _ssidCached = false;
+    _cachedSSID = "";
 }
 
 static void wifiEventHandler(WiFiEvent_t event) {
@@ -199,19 +208,6 @@ void wifiUpdate() {
     }
 }
 
-class CaptiveRequestHandler : public AsyncWebHandler {
-public:
-    bool canHandle(AsyncWebServerRequest *request) const override {
-        if (request->url() == "/save"   ||
-            request->url() == "/status" ||
-            request->url() == "/clear") return false;
-        return true;
-    }
-    void handleRequest(AsyncWebServerRequest *request) {
-        request->send(200, "text/html", PORTAL_HTML);
-    }
-};
-
 void wifiStartPortal() {
     if (portalActive) return;
     portalActive = true;
@@ -224,47 +220,65 @@ void wifiStartPortal() {
     WiFi.setSleep(false);
     esp_wifi_set_ps(WIFI_PS_NONE);
 
-    if (WiFi.softAP(WIFI_AP_NAME, WIFI_AP_PASS, 6)) {
-        dnsServer.start(53, "*", WiFi.softAPIP());
-        portalServer = new AsyncWebServer(80);
-
-        String savedS = wifiGetPortalSSID();
-        static String cachedStatusJSON;
-        cachedStatusJSON = "{\"saved\":"
-            + String(savedS.length() > 0 ? "true" : "false")
-            + ",\"ssid\":\"" + savedS + "\"}";
-
-        portalServer->on("/status", HTTP_GET,
-            [](AsyncWebServerRequest *request) {
-                request->send(200, "application/json", cachedStatusJSON);
-            });
-
-        portalServer->on("/clear", HTTP_POST,
-            [](AsyncWebServerRequest *request) {
-                request->send(200, "application/json", "{\"status\":\"ok\"}");
-                portalShouldClear = true;
-            });
-
-        portalServer->on("/save", HTTP_POST,
-            [](AsyncWebServerRequest *request) {}, NULL,
-            [](AsyncWebServerRequest *request, uint8_t *data,
-               size_t len, size_t index, size_t total) {
-                JsonDocument doc;
-                DeserializationError error = deserializeJson(doc, (const char*)data, len);
-                if (!error) {
-                    portalPendingSSID   = doc["ssid"].as<String>();
-                    portalPendingPass   = doc["password"].as<String>();
-                    portalSaveAndReboot = true;
-                    request->send(200, "application/json",
-                                  "{\"status\":\"ok\"}");
-                }
-            });
-
-        portalServer->addHandler(new CaptiveRequestHandler())
-                    .setFilter(ON_AP_FILTER);
-        portalServer->begin();
-        Serial.println("[Portal] Web server started.");
+    if (!WiFi.softAP(WIFI_AP_NAME, WIFI_AP_PASS, 6)) {
+        Serial.println("[Portal] SoftAP failed!");
+        portalActive = false;
+        return;
     }
+
+    delay(100);
+    dnsServer.start(53, "*", WiFi.softAPIP());
+
+    String savedS = wifiGetPortalSSID();
+    _portalStatusJSON  = "{\"saved\":";
+    _portalStatusJSON += (savedS.length() > 0) ? "true" : "false";
+    _portalStatusJSON += ",\"ssid\":\"";
+    _portalStatusJSON += savedS;
+    _portalStatusJSON += "\"}";
+
+    portalServer = new AsyncWebServer(80);
+
+    portalServer->on("/status", HTTP_GET,
+        [](AsyncWebServerRequest *request) {
+            request->send(200, "application/json", _portalStatusJSON);
+        });
+
+    portalServer->on("/clear", HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            portalShouldClear = true;
+        });
+
+    portalServer->on("/save", HTTP_POST,
+        [](AsyncWebServerRequest *request) {}, NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data,
+           size_t len, size_t index, size_t total) {
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc,
+                                            (const char*)data, len);
+            if (!error) {
+                portalPendingSSID   = doc["ssid"].as<String>();
+                portalPendingPass   = doc["password"].as<String>();
+                portalSaveAndReboot = true;
+                request->send(200, "application/json", "{\"status\":\"ok\"}");
+            } else {
+                Serial.println("[Portal] JSON parse error!");
+                request->send(400, "application/json", "{\"status\":\"error\"}");
+            }
+        });
+
+    portalServer->on("/", HTTP_GET,
+        [](AsyncWebServerRequest *request) {
+            request->send(200, "text/html", PORTAL_HTML);
+        });
+
+    portalServer->onNotFound(
+        [](AsyncWebServerRequest *request) {
+            request->redirect("/");
+        });
+
+    portalServer->begin();
+    Serial.println("[Portal] Web server started.");
 }
 
 void wifiStopPortal() {
@@ -293,6 +307,7 @@ void wifiProcessPortal() {
             portalPrefs.putString("pass", portalPendingPass);
         }
         portalPrefs.end();
+        wifiInvalidateSSIDCache();
         ESP.restart();
     }
 }
@@ -318,16 +333,21 @@ uint32_t wifiConnUptime() {
 bool wifiHasPortalCredentials() { return wifiGetPortalSSID().length() > 0; }
 
 String wifiGetPortalSSID() {
+    if (_ssidCached) return _cachedSSID;
+
     portalPrefs.begin("wifi", true);
-    String s = portalPrefs.getString("ssid", "");
+    _cachedSSID = portalPrefs.getString("ssid", "");
     portalPrefs.end();
-    return s;
+    _ssidCached = true;
+
+    return _cachedSSID;
 }
 
 void wifiClearPortalCredentials() {
     portalPrefs.begin("wifi", false);
     portalPrefs.clear();
     portalPrefs.end();
+    wifiInvalidateSSIDCache();
 }
 
 float wifiTxPower() {
