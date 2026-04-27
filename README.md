@@ -4,7 +4,9 @@ CLUNCHI is an ESP32-based quirked up network companion.
 
 Built on an ESP32-C3 supermini with a 1.3" SH1106 OLED, capacitive touch, and a tiny speaker (8ohm .25 Watt)
 
-**Build design and 3d Print files coming soon**
+3D Print files @ https://www.printables.com/model/1702860-clunchi-v1
+
+**Build design coming soon**
 
 - local Wi-Fi setup through a captive portal stored to NVS
 - network health monitoring
