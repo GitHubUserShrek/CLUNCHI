@@ -130,7 +130,7 @@ static void act_back() {
     menuLongHandled = true;
 }
 
-static void act_exit()     { exitMenu(); }
+static void act_exit()     { exitMenu(); audio.saveSettings();}
 static void act_reboot()   { ESP.restart(); }
 static void act_settings() { currentMenu = MENU_SETTINGS; menuCursor = 0; menuLongHandled = true; }
 static void act_volume()   { currentMenu = MENU_VOLUME;   menuCursor = 0; menuLongHandled = true; }
