@@ -7,6 +7,7 @@
 #include "ble_manager.h"
 #include "deauth_detector.h"
 #include "net_health.h"
+#include "wardriving.h"
 #include <Preferences.h>
 
 extern Audio     audio;
@@ -19,6 +20,8 @@ uint32_t lastInteraction = 0;
 static bool     _wasConnected   = false;
 static bool     _wasNetDown     = false;
 static bool     _radarActive    = false;
+static bool _wardrivingActive = false;
+static bool     _wardrivingTouchLock = true;
 static bool     _radarTouchLock = true;
 static uint32_t _lastAlertTime  = 0;
 static uint32_t _sleepTimeoutMs = 30000;
@@ -41,6 +44,7 @@ const char* moodName(Mood m) {
         case VIGILANT: return "VIGILANT";
         case ENRAGED:  return "ENRAGED";
         case DEAD:     return "DEAD";
+        case DRIVING:  return "DRIVING";
         default:       return "???";
     }
 }
@@ -266,6 +270,45 @@ static void _updateRadar(uint32_t now) {
     }
 }
 
+bool isWardrivingMoodActive() { return _wardrivingActive; }
+
+void triggerWardriving() {
+    _wardrivingActive    = true;
+    _wardrivingTouchLock = true;
+
+    wardrivingBegin();
+
+    _setMood(DRIVING);
+    lastInteraction = millis();
+
+    Serial.println("[Mood] === WARDRIVING MODE ACTIVATED ===");
+    audio.beep(1000, 50);
+    delay(80);
+    audio.beep(1200, 50);
+}
+
+void exitWardriving() {
+    if (!_wardrivingActive) return;
+    _wardrivingActive = false;
+
+    wardrivingEnd();
+
+    _setMood(baseMood());
+    lastInteraction = millis();
+
+    Serial.println("[Mood] === WARDRIVING MODE DEACTIVATED ===");
+    audio.beep(900, 50);
+}
+
+static void _updateWardriving(uint32_t now) {
+    if (!isTouched) _wardrivingTouchLock = false;
+
+    if (longTouchActive && !_wardrivingTouchLock) {
+        exitWardriving();
+        return;
+    }
+}
+
 static void _updateNetworkState(uint32_t now, bool connected) {
     if (connected != _wasConnected) {
         if (!connected && deauthHasRecentAlert(15000)) {
@@ -316,7 +359,7 @@ static void _updateMoodDecay(uint32_t now, bool connected) {
     if (isDribbleActive()) return;
 
     if (_sleepTimeoutMs > 0 && idleTime > _sleepTimeoutMs &&
-        mood != SLEEPY && mood != DEAD) {
+        mood != SLEEPY && mood != DEAD && mood != DRIVING) {
         _setMood(SLEEPY);
         audio.sleepy();
         Serial.println("[Mood] HonkShoo mimimi");
@@ -403,6 +446,11 @@ void moodUpdate(TouchEvent event) {
 
     if (_radarActive) {
         _updateRadar(now);
+        return;
+    }
+
+    if (_wardrivingActive) {
+        _updateWardriving(now);
         return;
     }
 

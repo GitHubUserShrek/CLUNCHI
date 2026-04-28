@@ -286,8 +286,6 @@ void bleForceSweep() {
     Serial.println("[BLE] Forced sweep started.");
 }
 
-bool isBleRadarActive() { return _radarMode; }
-
 void bleUpdate() {
     if (!_bleInitialised || !_pScan) return;
 

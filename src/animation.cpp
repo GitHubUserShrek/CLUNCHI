@@ -82,6 +82,11 @@ void Animation::update(Mood currentMood) {
     } else if (currentMood == VIGILANT) {
         pupilX_ = (int)(sin(now / 800.0f) * 4.0f);
         pupilY_ = (int)(sin(now / 1200.0f) * 1.0f);
+
+    } else if (currentMood == DRIVING) {
+        bounceY_ = sin(now / 400.0f) * 1.0f;  
+
+
     } else if (currentMood == ENRAGED || currentMood == DEAD) {
         pupilX_ = 0;
         pupilY_ = 0;
@@ -119,6 +124,9 @@ void Animation::update(Mood currentMood) {
     }
     else if (currentMood == VIGILANT) {
         bounceY_ = sin(now / 600.0f) * 0.8f;
+    }     
+    else if (currentMood == DRIVING) {
+        bounceY_ = sin(now / 300.0f) * 1.5f;
     }
     else {
         bounceY_ = 0;
@@ -140,6 +148,9 @@ void Animation::update(Mood currentMood) {
     }
     else if (currentMood == ENRAGED) {
         headTilt_ = sin(now / 150.0f) * 1.5f;
+    }
+    else if (currentMood == DRIVING) {
+        headTilt_ = sin(now / 1200.0f) * 2.0f;
     }
     else {
         headTilt_ = 0;

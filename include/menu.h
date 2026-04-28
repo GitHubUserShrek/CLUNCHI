@@ -21,6 +21,5 @@ void menuUpdate();
 void enterMenu();
 void exitMenu();
 bool isMenuActive();
-bool menuWantsRadar();  
 void showConfirm(const char* line1, const char* line2,
                  MenuMode returnTo);

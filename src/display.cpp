@@ -1,4 +1,6 @@
 #include "display.h"
+#include "wardriving.h"
+#include "gps_manager.h"
 #include <Wire.h>
 
 bool Display::begin() {
@@ -152,6 +154,56 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawHLine(leftX - 8, eyeYLeft - 5, 16);
         u8g2_.drawHLine(rightX - 8, eyeYRight - 5, 16);
     }
+    else if (currentMood == DRIVING) {
+        uint32_t now = millis();
+        float cycle = fmod(now / 4000.0f, 1.0f); 
+
+        if (cycle > 0.4f && cycle < 0.6f) {
+            float winkPhase = (cycle - 0.4f) / 0.2f;
+            float winkAmount = sin(winkPhase * PI);
+
+            if (winkAmount > 0.8f) {
+                u8g2_.drawLine(leftX - 5, eyeYLeft - 4, leftX + 2, eyeYLeft);
+                u8g2_.drawLine(leftX + 2, eyeYLeft, leftX - 5, eyeYLeft + 4);
+                u8g2_.drawLine(leftX - 3, eyeYLeft - 3, leftX + 4, eyeYLeft);
+                u8g2_.drawLine(leftX + 4, eyeYLeft, leftX - 3, eyeYLeft + 3);
+                u8g2_.drawLine(leftX - 1, eyeYLeft - 2, leftX + 5, eyeYLeft);
+                u8g2_.drawLine(leftX + 5, eyeYLeft, leftX - 1, eyeYLeft + 2);
+            } else if (winkAmount > 0.4f) {
+                u8g2_.drawHLine(leftX - 6, eyeYLeft, 12);
+                u8g2_.drawHLine(leftX - 5, eyeYLeft - 1, 10);
+                u8g2_.drawHLine(leftX - 5, eyeYLeft + 1, 10);
+            } else {
+                int squintR = (int)(eyeR * (1.0f - winkAmount));
+                u8g2_.drawDisc(leftX, eyeYLeft, squintR);
+                u8g2_.setDrawColor(0);
+                u8g2_.drawDisc(leftX + 2, eyeYLeft - 1, 1);
+                u8g2_.setDrawColor(1);
+            }
+        } else {
+            u8g2_.drawDisc(leftX, eyeYLeft, eyeR);
+            u8g2_.setDrawColor(0);
+            u8g2_.drawDisc(leftX + 2, eyeYLeft - 1, 2);
+            u8g2_.setDrawColor(1);
+        }
+
+        u8g2_.drawLine(leftX - 8, eyeYLeft - 10, leftX + 6, eyeYLeft - 9);
+        u8g2_.drawLine(leftX - 8, eyeYLeft - 11, leftX + 6, eyeYLeft - 10);
+
+        u8g2_.drawDisc(rightX, eyeYRight - 2, eyeR + 1);
+        u8g2_.setDrawColor(0);
+        u8g2_.drawDisc(rightX + 2, eyeYRight - 3, 2);
+        u8g2_.setDrawColor(1);
+
+        float browCycle = fmod(now / 3000.0f, 1.0f);
+        float browRaise = sin(browCycle * PI * 2) * 3.0f;
+        int browY = eyeYRight - 14 - (int)browRaise;
+
+        u8g2_.drawLine(rightX - 7, browY + 2, rightX, browY);
+        u8g2_.drawLine(rightX, browY, rightX + 8, browY + 1);
+        u8g2_.drawLine(rightX - 7, browY + 1, rightX, browY - 1);
+        u8g2_.drawLine(rightX, browY - 1, rightX + 8, browY);
+    }
     else if (currentMood == ENRAGED) {
         int wideR = eyeR + 1;
         if (eyeHeight < 4) {
@@ -241,6 +293,28 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawPixel(mouthCX - 9, mouthY + 1);
         u8g2_.drawPixel(mouthCX + 8, mouthY + 1);
         u8g2_.drawPixel(mouthCX + 9, mouthY + 1);
+    }     
+    else if (currentMood == DRIVING) {
+        uint32_t now = millis();
+        float smirkCycle = fmod(now / 5000.0f, 1.0f);
+        float smirkGrow = sin(smirkCycle * PI);
+
+        int smirkHeight = 3 + (int)(smirkGrow * 3.0f);
+
+        int endX = mouthCX + 9;
+        int endY = mouthY - smirkHeight;
+
+        u8g2_.drawHLine(mouthCX - 14, mouthY, 10);
+
+        u8g2_.drawLine(mouthCX - 4, mouthY, mouthCX + 2, mouthY - 1);
+        u8g2_.drawLine(mouthCX + 2, mouthY - 1, mouthCX + 6, mouthY - 3);
+        u8g2_.drawLine(mouthCX + 6, mouthY - 3, endX, endY);
+
+        u8g2_.drawLine(endX, endY - 4, endX + 2, endY - 2);
+        u8g2_.drawLine(endX + 2, endY - 2, endX + 3, endY);
+        u8g2_.drawLine(endX + 3, endY, endX + 2, endY + 2);
+        u8g2_.drawLine(endX + 2, endY + 2, endX, endY + 4);
+
     }
     else if (currentMood == ENRAGED) {
         u8g2_.drawLine(mouthCX - 14, mouthY, mouthCX - 9, mouthY - 4);
@@ -276,6 +350,47 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawFrame(0, 0, OLED_WIDTH, OLED_HEIGHT);
     } else {
         u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+    }
+
+    if (currentMood == DRIVING) {
+        u8g2_.setFont(u8g2_font_5x7_tr);
+
+        u8g2_.drawStr(3, 20, "W");
+        u8g2_.drawStr(3, 30, "A");
+        u8g2_.drawStr(3, 40, "R");
+
+        u8g2_.drawStr(120, 20, "D");
+        u8g2_.drawStr(120, 30, "R");
+        u8g2_.drawStr(120, 40, "V");
+
+        char netBuf[16];
+        snprintf(netBuf, sizeof(netBuf), "%lu", (unsigned long)wardrivingNetworksLogged);
+        u8g2_.drawStr(8, 60, netBuf);
+
+        int wifiX = 10 + (strlen(netBuf) * 5) + 3;
+        u8g2_.drawCircle(wifiX + 3, 59, 2, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+        u8g2_.drawCircle(wifiX + 3, 59, 4, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+        u8g2_.drawPixel(wifiX + 3, 59);
+
+        if (gpsData.valid) {
+            int gx = 100, gy = 57;
+            u8g2_.drawBox(gx, gy, 5, 3);
+            u8g2_.drawBox(gx - 4, gy, 3, 3);
+            u8g2_.drawBox(gx + 6, gy, 3, 3);
+            u8g2_.drawVLine(gx + 2, gy - 2, 2);
+            u8g2_.drawPixel(gx + 1, gy - 3);
+            u8g2_.drawPixel(gx + 3, gy - 3);
+            if ((millis() / 500) % 2) {
+                u8g2_.drawCircle(gx + 2, gy - 3, 3, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+            }
+            char satBuf[8];
+            snprintf(satBuf, sizeof(satBuf), "%d", gpsData.satellites);
+            u8g2_.drawStr(gx + 12, 60, satBuf);
+        } else {
+            if ((millis() / 800) % 2) {
+                u8g2_.drawStr(100, 60, "GPS?");
+            }
+        }
     }
 
     render();
@@ -369,6 +484,7 @@ void Display::drawAlertMarks() {
         u8g2_.drawStr(6, 58, "!");
     }
 }
+
 
 void Display::drawMenu(const char* title, const char** items, uint8_t itemCount, int selectedIdx, int arrowIdx) {
     clear();
