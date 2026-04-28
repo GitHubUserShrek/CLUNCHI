@@ -135,7 +135,14 @@ void Audio::spiralEyes() {
 }
 
 void Audio::heartEyes() {
-    happy();
+    beep(1000, 120);
+    delay(30);
+    beep(2000, 120);
+    delay(30);
+    beep(1500, 60);
+    delay(30);
+    beep(2500, 60);
+    
 }
 
 void Audio::radarOn() {

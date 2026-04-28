@@ -12,6 +12,9 @@
 #include "deauth_detector.h"
 #include "net_health.h"
 #include "web_dashboard.h"
+#include "gps_manager.h"
+#include "sd_manager.h"
+#include "wardriving.h"
 
 Display   display;
 Audio     audio;
@@ -78,6 +81,9 @@ void setup() {
     }
 
     wifiBegin();
+    gpsBegin();
+    sdBegin();
+   // wardrivingBegin();
 
     display.drawSplash();
     audio.chirp();
@@ -99,10 +105,16 @@ void loop() {
     wifiProcessPortal();
     handleWifiLifecycle();
 
-    if (isRadarActive()) bleUpdate();
-    deauthDetectorUpdate();
-    netHealthUpdate();
-    dashboardUpdate();
+    if (isRadarActive())      bleUpdate();
+    if (deauthDetectorActive) deauthDetectorUpdate();
+    if (nhActive)             netHealthUpdate();
+    if (isDashboardActive())  dashboardUpdate();
+    if (gpsActive)            gpsUpdate();
+    if (sdActive)             sdUpdate();
+    if (wardrivingActive) {
+        wardrivingUpdate();
+        gpsPrintStatus();
+    }
 
     if (wifiIsPortalActive()) {
         handleTouch();
@@ -129,10 +141,6 @@ void loop() {
 
     if (isMenuActive()) {
         menuUpdate();
-
-        if (menuWantsRadar()) {
-            triggerRadar();
-        }
         return;
     }
 
@@ -141,9 +149,7 @@ void loop() {
     }
 
     TouchEvent ev = consumeTouchEvent();
-
     moodUpdate(ev);
-
     animation.update(mood);
 
     display.drawFace(mood, animation.getState());

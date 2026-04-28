@@ -5,6 +5,10 @@
 #include "ble_manager.h"
 #include "audio.h"
 #include "config.h"
+#include "mood.h"
+#include "wardriving.h"
+#include "sd_manager.h"
+#include "gps_manager.h"
 #include <Preferences.h>
 #include <algorithm>
 
@@ -14,7 +18,6 @@ extern Audio   audio;
 static MenuMode currentMenu     = MENU_OFF;
 static int      menuCursor      = 0;
 static bool     menuLongHandled = true;
-static bool     _wantsRadar     = false;  
 
 static bool wifiMenuScanning  = false;
 static int  wifiMenuCursor    = 0;
@@ -45,6 +48,7 @@ static MenuMode confirmReturnTo  = MENU_MAIN;
 
 struct MenuItem { const char* name; void (*action)(); };
 
+// ── Forward declarations ─────────────────────────────
 static void act_back();
 static void act_exit();
 static void act_settings();
@@ -55,6 +59,7 @@ static void act_wifi_portal();
 static void act_wifi_info();
 static void act_wifi_clear_nvs();
 static void act_wifi_disconnect();
+static void act_wardriving();
 static void act_ble();
 static void act_ble_scan();
 static void act_ble_radar();
@@ -73,6 +78,7 @@ static void drawBleScanScreen();
 static void drawSleepTimerScreen();
 static void drawConfirmScreen();
 
+// ── Menu definitions ─────────────────────────────────
 static const char*    mainItems[] = { "WiFi", "BLE", "Settings", "Exit" };
 static const MenuItem mainOpts[]  = {
     { "WiFi",     act_wifi     },
@@ -91,33 +97,36 @@ static const MenuItem settOpts[]  = {
 
 static const char*    volItems[] = { "Vol +", "Vol -", "Mute/Unmute", "Back" };
 static const MenuItem volOpts[]  = {
-    { "Vol +", act_vol_up   },
-    { "Vol -", act_vol_down },
-    { "Mute/Unmute",  act_mute     },
-    { "Back",  act_back     }
+    { "Vol +",       act_vol_up   },
+    { "Vol -",       act_vol_down },
+    { "Mute/Unmute", act_mute     },
+    { "Back",        act_back     }
 };
 
 static const char*    wifiItems[] = {
-    "Scan", "Connect", "Net Info",
-    "Setup Portal", "Clear Saved", "Disconnect", "Back"
+    "Scan", "Connect", "Disconnect", "Net Info",
+    "Setup Portal", "Clear Saved",
+    "Wardriving", "Back"
 };
 static const MenuItem wifiOpts[] = {
-    { "Scan",         act_wifi_scan      },
-    { "Connect",      act_wifi_connect   },
-    { "Net Info",     act_wifi_info      },
-    { "Setup Portal", act_wifi_portal    },
-    { "Clear Saved",  act_wifi_clear_nvs },
-    { "Disconnect",   act_wifi_disconnect},
-    { "Back",         act_back           }
+    { "Scan",         act_wifi_scan       },
+    { "Connect",      act_wifi_connect    },
+    { "Disconnect",   act_wifi_disconnect },
+    { "Net Info",     act_wifi_info       },
+    { "Setup Portal", act_wifi_portal     },
+    { "Clear Saved",  act_wifi_clear_nvs  },
+    { "Wardriving",   act_wardriving      },
+    { "Back",         act_back            }
 };
 
 static const char*    bleItems[] = { "Scan", "Radar", "Back" };
 static const MenuItem bleOpts[]  = {
-    { "Scan",  act_ble_scan   },
-    { "Radar", act_ble_radar  },
-    { "Back",  act_back       }
+    { "Scan",  act_ble_scan  },
+    { "Radar", act_ble_radar },
+    { "Back",  act_back      }
 };
 
+// ── Actions ──────────────────────────────────────────
 static void act_back() {
     if (currentMenu == MENU_VOLUME || currentMenu == MENU_SLEEP_TIMER) {
         currentMenu = MENU_SETTINGS;
@@ -130,12 +139,12 @@ static void act_back() {
     menuLongHandled = true;
 }
 
-static void act_exit()     { exitMenu(); audio.saveSettings();}
+static void act_exit()     { exitMenu(); audio.saveSettings(); }
 static void act_reboot()   { ESP.restart(); }
-static void act_settings() { currentMenu = MENU_SETTINGS; menuCursor = 0; menuLongHandled = true; }
-static void act_volume()   { currentMenu = MENU_VOLUME;   menuCursor = 0; menuLongHandled = true; }
+static void act_settings() { currentMenu = MENU_SETTINGS;  menuCursor = 0; menuLongHandled = true; }
+static void act_volume()   { currentMenu = MENU_VOLUME;    menuCursor = 0; menuLongHandled = true; }
 static void act_wifi()     { wifiBegin(); currentMenu = MENU_WIFI; menuCursor = 0; menuLongHandled = true; }
-static void act_ble()      { currentMenu = MENU_BLE;      menuCursor = 0; menuLongHandled = true; }
+static void act_ble()      { currentMenu = MENU_BLE;       menuCursor = 0; menuLongHandled = true; }
 
 static void act_vol_up() {
     audio.setVolume(std::min(255, (int)audio.getVolume() + 32));
@@ -149,9 +158,7 @@ static void act_vol_down() {
 
 static void act_mute() {
     audio.toggleMute();
-    if (!audio.isMuted()) {
-        audio.beep(440, 20);  
-    }
+    if (!audio.isMuted()) audio.beep(440, 20);
 }
 
 static void act_wifi_info() {
@@ -159,8 +166,8 @@ static void act_wifi_info() {
         showConfirm("Not Connected", "Connect first", MENU_WIFI);
         return;
     }
-    wifiInfoPage = 0;
-    currentMenu  = MENU_WIFI_INFO;
+    wifiInfoPage    = 0;
+    currentMenu     = MENU_WIFI_INFO;
     menuLongHandled = true;
 }
 
@@ -200,6 +207,18 @@ static void act_wifi_disconnect() {
     menuLongHandled = true;
 }
 
+static void act_wardriving() {
+    if (!sdActive) {
+        display.drawConfirm("No SD Card", "Serial log only");
+        delay(1500); 
+    }
+    exitMenu();
+    triggerWardriving();
+    audio.beep(1000, 50);
+    delay(80);
+    audio.beep(1200, 50);
+}
+
 static void act_ble_scan() {
     wifiDeinit();
     delay(500);
@@ -207,8 +226,8 @@ static void act_ble_scan() {
     delay(100);
 
     if (isBleInitialised()) {
-        bleCount      = 0;
-        bleMenuCursor = 0;
+        bleCount        = 0;
+        bleMenuCursor   = 0;
         bleStartScan();
         bleMenuScanning = true;
         currentMenu     = MENU_BLE_SCAN;
@@ -220,8 +239,8 @@ static void act_ble_scan() {
 }
 
 static void act_ble_radar() {
-    _wantsRadar = true;
     exitMenu();
+    triggerRadar();
     menuLongHandled = true;
 }
 
@@ -237,13 +256,6 @@ static void act_sleep_timer() {
     menuLongHandled  = true;
 }
 
-bool menuWantsRadar() {
-    if (_wantsRadar) {
-        _wantsRadar = false;
-        return true;
-    }
-    return false;
-}
 
 static void drawWifiInfoScreen() {
     static char l1[32], l2[32], l3[32], l4[32];
@@ -275,7 +287,7 @@ static void drawWifiInfoScreen() {
         snprintf(l1, 31, "MAC: %s",    wifiMACAddress().c_str());
         { uint32_t up = wifiConnUptime();
           snprintf(l2, 31, "Up: %lum %lus",
-              (unsigned long)(up/60), (unsigned long)(up%60)); }
+              (unsigned long)(up / 60), (unsigned long)(up % 60)); }
         snprintf(l3, 31, "Tap:Next Hold:Back");
         l4[0] = '\0';
         break;
@@ -334,7 +346,7 @@ static void drawWifiConnectScreen() {
             const char* itm[] = { "Scanning..." };
             display.drawMenu("WIFI", itm, 1, -1);
         } else {
-            static char      apLines[20][32];
+            static char       apLines[20][32];
             static const char* apPtrs[20];
             for (int i = 0; i < scanCount; i++) {
                 snprintf(apLines[i], 31, "%s%s",
@@ -353,6 +365,18 @@ static void drawWifiPortalScreen() {
         "Connect:", "CLUNCHI_Setup", "192.168.4.1", "Hold: Stop"
     };
     display.drawMenu("PORTAL", itm, 4, -1);
+}
+
+static void drawWardrivingScreen() {
+    char l1[32], l2[32], l3[32], l4[32];
+
+    snprintf(l1, 31, "Status: %s", wardrivingActive ? "ACTIVE" : "OFF");
+    snprintf(l2, 31, "GPS: %s",    gpsData.valid ? "LOCKED" : "SEARCHING");
+    snprintf(l3, 31, "Nets: %lu",  (unsigned long)wardrivingNetworksLogged);
+    snprintf(l4, 31, "SD: %s",     sdActive ? "READY" : "NO CARD");
+
+    const char* itm[] = { l1, l2, l3, l4, "Hold: Stop+Back" };
+    display.drawMenu("WARDRIVING", itm, 5, -1);
 }
 
 static void drawBleScanScreen() {
@@ -405,7 +429,7 @@ void enterMenu() {
 }
 
 void showConfirm(const char* l1, const char* l2, MenuMode ret) {
-    strncpy(confirmLine1, l1,       31);
+    strncpy(confirmLine1, l1,          31);
     strncpy(confirmLine2, l2 ? l2 : "", 31);
     confirmReturnTo = ret;
     currentMenu     = MENU_CONFIRM;
@@ -506,7 +530,11 @@ void menuUpdate() {
     }
 
     if (currentMenu == MENU_WIFI_INFO) {
-        if (!wifiConnected()) { currentMenu = MENU_WIFI; menuCursor = 2; return; }
+        if (!wifiConnected()) {
+            currentMenu = MENU_WIFI;
+            menuCursor  = 2;
+            return;
+        }
         if (touchJustReleased && !touchWasLongPress) {
             wifiInfoPage = (wifiInfoPage + 1) % WIFI_INFO_PAGES;
             audio.beep(600, 20);
@@ -543,14 +571,14 @@ void menuUpdate() {
         return;
     }
 
-    const char**     items = nullptr;
-    const MenuItem*  opts  = nullptr;
-    int              size  = 0;
+    const char**    items = nullptr;
+    const MenuItem* opts  = nullptr;
+    int             size  = 0;
 
     switch (currentMenu) {
     case MENU_MAIN:     items = mainItems; opts = mainOpts; size = 4; break;
     case MENU_SETTINGS: items = settItems; opts = settOpts; size = 4; break;
-    case MENU_WIFI:     items = wifiItems; opts = wifiOpts; size = 7; break;
+    case MENU_WIFI:     items = wifiItems; opts = wifiOpts; size = 8; break;
     case MENU_BLE:      items = bleItems;  opts = bleOpts;  size = 3; break;
     case MENU_VOLUME:   items = volItems;  opts = volOpts;  size = 4; break;
     default: return;

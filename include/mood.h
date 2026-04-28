@@ -12,6 +12,7 @@ enum Mood {
     VIGILANT,
     ENRAGED,
     DEAD,
+    DRIVING,
     MOOD_COUNT
 };
 
@@ -25,6 +26,10 @@ void moodUpdate(TouchEvent event);
 void triggerRadar();
 void exitRadar();
 bool isRadarActive();
+
+void triggerWardriving();
+void exitWardriving();
+bool isWardrivingMoodActive();
 
 const char* moodName(Mood m);
 Mood        baseMood();

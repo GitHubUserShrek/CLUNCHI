@@ -35,5 +35,4 @@ void blePrintAlerts();
 
 void bleStartRadar();
 void bleStopRadar();
-bool isBleRadarActive();
 void bleForceSweep();
