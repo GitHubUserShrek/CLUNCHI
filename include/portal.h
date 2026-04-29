@@ -43,7 +43,7 @@ const char PORTAL_HTML[] PROGMEM = R"rawliteral(
     <input type="text" id="ssid" placeholder="WIFI NAME" autocomplete="off" spellcheck="false">
     <input type="password" id="pass" placeholder="PASSWORD (LEAVE BLANK IF OPEN)" spellcheck="false">
 
-    <button onclick="save()">CONNECT TO NETWORK</button>
+    <button onclick="save()">SAVE NETWORK</button>
     <button id="clearBtn" onclick="if(confirm('ERASE SAVED WIFI?'))clearWiFi()">ERASE SAVED WIFI</button>
 
     <div class="footer">

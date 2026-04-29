@@ -4,6 +4,7 @@
 #include "wifi_manager.h"
 #include <WiFi.h>
 #include <SD.h>
+#include <new>
 
 #define WD_SCAN_INTERVAL_MS   10000
 #define WD_MAX_NETWORKS       50
@@ -17,16 +18,17 @@ static uint32_t _lastScanTime  = 0;
 static bool     _scanRequested = false;
 static bool     _scanning      = false;
 
-#define WD_SEEN_CAPACITY 4096
+#define WD_SEEN_CAPACITY 2048
 #define WD_SEEN_EMPTY    0
 #define WD_SEEN_USED     1
 
-static struct {
+struct SeenEntry {
     uint8_t  state;
     uint32_t hash;
     String   bssid;
-} _seenTable[WD_SEEN_CAPACITY];
+};
 
+static SeenEntry* _seenTable = nullptr;
 static int _seenCount = 0;
 
 static uint32_t fnvHash(const String& s) {
@@ -38,10 +40,54 @@ static uint32_t fnvHash(const String& s) {
     return h;
 }
 
+static void clearSeen() {
+    if (!_seenTable) {
+        _seenCount = 0;
+        return;
+    }
+
+    for (int i = 0; i < WD_SEEN_CAPACITY; i++) {
+        _seenTable[i].state = WD_SEEN_EMPTY;
+        _seenTable[i].hash  = 0;
+        _seenTable[i].bssid = "";
+    }
+    _seenCount = 0;
+}
+
+static bool allocSeen() {
+    if (_seenTable) return true;
+
+    _seenTable = new SeenEntry[WD_SEEN_CAPACITY];
+    if (!_seenTable) {
+        Serial.println("[Wardriving] Warning — failed to allocate dedup table. Continuing without dedup.");
+        _seenCount = 0;
+        return false;
+    }
+
+    clearSeen();
+    Serial.printf("[Wardriving] Dedup table allocated (%d entries)\n", WD_SEEN_CAPACITY);
+    return true;
+}
+
+static void freeSeen() {
+    if (!_seenTable) {
+        _seenCount = 0;
+        return;
+    }
+
+    delete[] _seenTable;
+    _seenTable = nullptr;
+    _seenCount = 0;
+    Serial.println("[Wardriving] Dedup table freed");
+}
+
 static bool alreadySeen(const String& bssid) {
+    if (!_seenTable) return false;
     if (_seenCount >= WD_SEEN_CAPACITY) return false;
+
     uint32_t h = fnvHash(bssid);
     uint32_t idx = h % WD_SEEN_CAPACITY;
+
     for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++) {
         uint32_t i = (idx + probe) % WD_SEEN_CAPACITY;
         if (_seenTable[i].state == WD_SEEN_EMPTY) return false;
@@ -51,9 +97,12 @@ static bool alreadySeen(const String& bssid) {
 }
 
 static void markSeen(const String& bssid) {
+    if (!_seenTable) return;
     if (_seenCount >= WD_SEEN_CAPACITY - 1) return;
+
     uint32_t h = fnvHash(bssid);
     uint32_t idx = h % WD_SEEN_CAPACITY;
+
     for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++) {
         uint32_t i = (idx + probe) % WD_SEEN_CAPACITY;
         if (_seenTable[i].state == WD_SEEN_EMPTY) {
@@ -67,16 +116,8 @@ static void markSeen(const String& bssid) {
     }
 }
 
-static void clearSeen() {
-    for (int i = 0; i < WD_SEEN_CAPACITY; i++) {
-        _seenTable[i].state = WD_SEEN_EMPTY;
-        _seenTable[i].hash  = 0;
-        _seenTable[i].bssid = "";
-    }
-    _seenCount = 0;
-}
-
 static void checkAndRotateSession() {
+    if (!_seenTable) return;
     if (_seenCount < WD_SEEN_CAPACITY - 100) return;
 
     _sessionPart++;
@@ -145,6 +186,7 @@ static void logScanResults() {
 
     int logged = 0;
     int limit = min(n, WD_MAX_NETWORKS);
+
     for (int i = 0; i < limit; i++) {
         String bssid = WiFi.BSSIDstr(i);
 
@@ -199,6 +241,7 @@ static void logScanResults() {
     if (hasFile) {
         f.close();
     }
+
     WiFi.scanDelete();
     _scanning = false;
 
@@ -228,6 +271,8 @@ void wardrivingBegin() {
     if (!sdActive) {
         Serial.println("[Wardriving] Warning — SD card not mounted. Logging to serial only.");
     }
+
+    allocSeen();
 
     wardrivingActive         = true;
     wardrivingNetworksLogged = 0;
@@ -270,6 +315,8 @@ void wardrivingEnd() {
                   (unsigned long)(_sessionPart + 1));
     Serial.printf("[Wardriving]  Unique BSSIDs seen (last part): %d\n", _seenCount);
     Serial.println("[Wardriving] ==========================================");
+
+    freeSeen();
 }
 
 void wardrivingForceScan() {
