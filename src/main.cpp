@@ -83,7 +83,6 @@ void setup() {
     wifiBegin();
     gpsBegin();
     sdBegin();
-   // wardrivingBegin();
 
     display.drawSplash();
     audio.chirp();
@@ -104,12 +103,12 @@ void loop() {
     wifiUpdate();
     wifiProcessPortal();
     handleWifiLifecycle();
+    gpsUpdate();
 
     if (isRadarActive())      bleUpdate();
     if (deauthDetectorActive) deauthDetectorUpdate();
     if (nhActive)             netHealthUpdate();
     if (isDashboardActive())  dashboardUpdate();
-    if (gpsActive)            gpsUpdate();
     if (sdActive)             sdUpdate();
     if (wardrivingActive) {
         wardrivingUpdate();

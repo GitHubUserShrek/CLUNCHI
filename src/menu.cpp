@@ -48,7 +48,6 @@ static MenuMode confirmReturnTo  = MENU_MAIN;
 
 struct MenuItem { const char* name; void (*action)(); };
 
-// ── Forward declarations ─────────────────────────────
 static void act_back();
 static void act_exit();
 static void act_settings();
@@ -78,7 +77,6 @@ static void drawBleScanScreen();
 static void drawSleepTimerScreen();
 static void drawConfirmScreen();
 
-// ── Menu definitions ─────────────────────────────────
 static const char*    mainItems[] = { "WiFi", "BLE", "Settings", "Exit" };
 static const MenuItem mainOpts[]  = {
     { "WiFi",     act_wifi     },
@@ -126,7 +124,6 @@ static const MenuItem bleOpts[]  = {
     { "Back",  act_back      }
 };
 
-// ── Actions ──────────────────────────────────────────
 static void act_back() {
     if (currentMenu == MENU_VOLUME || currentMenu == MENU_SLEEP_TIMER) {
         currentMenu = MENU_SETTINGS;
