@@ -2,7 +2,7 @@
 
 CLUNCHI is an ESP32-based quirked up network companion.
 
-Built on an ESP32-C3 supermini with a 1.3" SH1106 OLED, capacitive touch, and a tiny speaker (8ohm .25 Watt)
+Built on an ESP32-C3 supermini with a 1.3" SH1106 OLED, capacitive touch, and a tiny speaker (8ohm .25 Watt) and now an SD reader as well as an ATGM336H GPS module.
 
 3D Print files @ https://www.printables.com/model/1702860-clunchi-v1
 
@@ -14,6 +14,7 @@ Built on an ESP32-C3 supermini with a 1.3" SH1106 OLED, capacitive touch, and a 
 - a network analyzer web dashboard
 - touch-driven mood/audio/animation reactions
 - early BLE radar functionality (currently only detects Flipper Zero)
+- GPS and SD logging for Wardriving 
 
 - Alot of the personality and info comes out in the serial monitor
 
@@ -61,7 +62,7 @@ If you want to change networks later, clear the saved credentials and use the se
 - L3 connectivity stats
 - Nearby network list
 - Hardware stats
-- Local JSON API endpoint
+- Local JSON API endpoint/ possible ESPHome port in the future
 
 ### Personality / Interaction
 - Touch-based interaction
@@ -73,6 +74,12 @@ If you want to change networks later, clear the saved credentials and use the se
 - Early BLE radar features
 - Minimal implementation in this beta
 - Planned expansion in future versions
+
+- **###Wardriving**
+- Scans for networks every 3 seconds
+- Dynamically allocated dedupe table to keep heap clean
+- Session based logging, once dedupe table is full, will create a new session part.
+- Logs in a .CSV with rssi, channel, and security protocol.
 
 ---
 
@@ -120,8 +127,7 @@ The dashboard currently includes:
 
 - ## Roadmap
 - ESP32-C5 board port
-- GPS module integration for wardriving
 - expanded BLE scanning and alerting
 - dashboard improvements
-- Logging data to SD card
+
 
