@@ -1,17 +1,7 @@
 #include "ble_manager.h"
+#include "oui_lookup.h"
 #include "config.h"
 #include <NimBLEDevice.h>
-
-struct OUIEntry {
-    const char* prefix;
-    const char* manufacturer;
-};
-
-static const OUIEntry ouiTable[] = {
-    { "80:7d:3a", "Flipper Devices" },
-    { "80:e1:26", "Flipper Devices" },
-};
-static const int ouiCount = sizeof(ouiTable) / sizeof(ouiTable[0]);
 
 struct BLEAlertRule {
     const char* nameContains;
@@ -22,13 +12,18 @@ struct BLEAlertRule {
 
 static const BLEAlertRule alertRules[] = {
     { "flipper",  nullptr,    nullptr, "Flipper Zero"        },
+    { nullptr,    nullptr,    "3081",  "Flipper Zero (Black)" },
+    { nullptr,    nullptr,    "3082",  "Flipper Zero (White)" },
+    { nullptr,    nullptr,    "3083",  "Flipper Zero (Transparent)" },
     { nullptr,    "80:7d:3a", nullptr, "Flipper Zero (OUI)"  },
     { nullptr,    "80:e1:26", nullptr, "Flipper Zero (OUI)"  },
-    { nullptr,    nullptr,    "3082",  "Flipper Zero (UUID)" },
+    { nullptr,    "80:e1:27", nullptr, "Flipper Zero (OUI)"  },
+    { nullptr,    "0c:fa:22", nullptr, "Flipper Zero (OUI)"  },
 };
+
 static const int alertRuleCount = sizeof(alertRules) / sizeof(alertRules[0]);
 
-BLEResult bleResults[20];
+BLEResult bleResults[40];
 int       bleCount      = 0;
 bool      bleScanActive = false;
 
@@ -38,19 +33,63 @@ static NimBLEScan*    _pScan          = nullptr;
 static bool           _radarMode      = false;
 static const uint32_t RADAR_SWEEP_MS  = 5000;
 
-static String lookupOUI(const String& addr) {
-    String prefix = addr.substring(0, 8);
-    prefix.toLowerCase();
-    for (int i = 0; i < ouiCount; i++) {
-        if (prefix == ouiTable[i].prefix) return ouiTable[i].manufacturer;
+static String buildDeviceType(const NimBLEAdvertisedDevice* device,
+                               const String& addr, bool isPublic,
+                               String& outManufacturer) {
+
+    if (device->haveManufacturerData()) {
+        std::string rawStd = device->getManufacturerData();
+        const uint8_t* data = (const uint8_t*)rawStd.data();
+        size_t len = rawStd.size();
+
+        if (len >= 2) {
+            uint16_t mfrId = (uint16_t)data[0] | ((uint16_t)data[1] << 8);
+            outManufacturer = decodeManufacturerID(mfrId);
+
+            if (mfrId == 0x004C && len >= 3) {
+                return "Apple " + decodeAppleType(data[2]);
+            }
+
+            if (!outManufacturer.isEmpty()) {
+                return outManufacturer + " Device";
+            }
+        }
     }
-    return "Unknown";
+
+    if (device->haveAppearance()) {
+        String fromAppearance = decodeAppearance(device->getAppearance());
+        if (!fromAppearance.isEmpty()) {
+            outManufacturer = isPublic ? lookupOUI(addr) : "Random MAC";
+            if (outManufacturer.isEmpty()) outManufacturer = "Unknown";
+            return fromAppearance;
+        }
+    }
+
+    int svcCount = device->getServiceUUIDCount();
+    for (int i = 0; i < svcCount; i++) {
+        String uuid = device->getServiceUUID(i).toString().c_str();
+        String fromService = decodeServiceUUID(uuid);
+        if (!fromService.isEmpty()) {
+            outManufacturer = isPublic ? lookupOUI(addr) : "Random MAC";
+            if (outManufacturer.isEmpty()) outManufacturer = "Unknown";
+            return fromService;
+        }
+    }
+
+    String oui = lookupOUI(addr);
+    if (!oui.isEmpty()) {
+        outManufacturer = oui;
+        return oui + " Device";
+    }
+
+    outManufacturer = isPublic ? "Unknown" : "Random MAC";
+    return isPublic ? "Unknown Device" : "Unknown Device";
 }
 
 static bool checkAlert(const String& addr, const String& name,
                        const NimBLEAdvertisedDevice* device,
                        String& outLabel) {
-    String prefix   = addr.substring(0, 8);
+    String prefix = addr.substring(0, 8);
     prefix.toLowerCase();
     String nameLower = name;
     nameLower.toLowerCase();
@@ -93,7 +132,7 @@ static bool checkAlert(const String& addr, const String& name,
 class ScanCallback : public NimBLEScanCallbacks {
 public:
     void onResult(const NimBLEAdvertisedDevice* device) override {
-        if (!device) return; 
+        if (!device) return;
 
         String addr = device->getAddress().toString().c_str();
 
@@ -104,36 +143,44 @@ public:
             }
         }
 
-        if (bleCount >= 20) return;
+        if (bleCount >= 40) return;
 
         String  name     = device->haveName() ? device->getName().c_str() : "";
         int     rssi     = device->getRSSI();
         uint8_t addrType = device->getAddress().getType();
         bool    isPublic = (addrType == 0 || addrType == 2);
 
-        String manufacturer = isPublic ? lookupOUI(addr) : "Random MAC";
-
         String alertLabel = "";
         bool   isAlert    = checkAlert(addr, name, device, alertLabel);
 
-        BLEResult& r  = bleResults[bleCount];
-        r.address      = addr;
-        r.name         = name;
-        r.rssi         = rssi;
-        r.manufacturer = manufacturer;
-        r.deviceType   = isPublic ? "Public" : "Random/Private";
-        r.isAlert      = isAlert;
-        r.alertLabel   = alertLabel;
-        r.isPublicAddr = isPublic;
-        r.isKnown      = false;
+        String manufacturer = "";
+        String deviceType   = buildDeviceType(device, addr, isPublic, manufacturer);
+
+        if (!name.isEmpty() && deviceType == "Private Device") {
+            deviceType = "Named Device";
+        }
+
+        BLEResult& r   = bleResults[bleCount];
+        r.address       = addr;
+        r.name          = name;
+        r.rssi          = rssi;
+        r.manufacturer  = manufacturer;
+        r.deviceType    = deviceType;
+        r.isAlert       = isAlert;
+        r.alertLabel    = alertLabel;
+        r.isPublicAddr  = isPublic;
+        r.isKnown       = false;
         bleCount++;
 
         if (isAlert) {
-            Serial.printf("[BLE] !!! ALERT: %s [%s] %s | %d dBm\n",
-                addr.c_str(), alertLabel.c_str(), manufacturer.c_str(), rssi);
+            Serial.printf("[BLE] !!! ALERT: %s [%s] %s | %s | %s | %d dBm\n",
+                addr.c_str(), alertLabel.c_str(), manufacturer.c_str(),
+                name.isEmpty() ? "No Name" : name.c_str(),
+                deviceType.c_str(), rssi);
         } else if (!_radarMode) {
-            Serial.printf("[BLE] Found: %s | %s | %d dBm\n",
-                addr.c_str(), manufacturer.c_str(), rssi);
+            String displayName = !name.isEmpty() ? name : deviceType;
+            Serial.printf("[BLE] Found: %-20s | %-25s | %-15s | %d dBm\n",
+                addr.c_str(), displayName.c_str(), manufacturer.c_str(), rssi);
         }
     }
 
@@ -148,11 +195,9 @@ static ScanCallback _scanCallback;
 
 void bleBegin() {
     if (_bleInitialised) return;
-
     Serial.println("[BLE] Radio Initializing...");
 
     NimBLEDevice::init("CLUNCHI");
-
     _pScan = NimBLEDevice::getScan();
     if (!_pScan) {
         Serial.println("[BLE] ERROR: getScan() returned null!");
@@ -167,57 +212,40 @@ void bleBegin() {
     _bleInitialised = true;
     bleScanActive   = false;
     bleCount        = 0;
-
     Serial.println("[BLE] Radio Ready.");
 }
 
 void bleDeinit() {
     if (!_bleInitialised) return;
-
     Serial.println("[BLE] Deinitializing Radio...");
 
     if (_pScan) {
-        if (bleScanActive) {
-            _pScan->stop();
-            delay(100);          
-        }
-        _pScan = nullptr;       
+        if (bleScanActive) { _pScan->stop(); delay(100); }
+        _pScan = nullptr;
     }
 
-    bleScanActive   = false;
-    _radarMode      = false;
-
+    bleScanActive = false;
+    _radarMode    = false;
     NimBLEDevice::deinit(true);
-
     _bleInitialised = false;
-    bleCount        = 0;
-
+    bleCount = 0;
     Serial.println("[BLE] Radio Offline.");
 }
 
 bool isBleInitialised() { return _bleInitialised; }
 
 void bleStartScan() {
-    if (!_bleInitialised) {
-        Serial.println("[BLE] Error: Call bleBegin first.");
-        return;
-    }
+    if (!_bleInitialised) { Serial.println("[BLE] Error: Call bleBegin first."); return; }
     if (bleScanActive) return;
-    if (!_pScan) {
-        Serial.println("[BLE] Error: _pScan is null!");
-        return;
-    }
+    if (!_pScan) { Serial.println("[BLE] Error: _pScan is null!"); return; }
 
     Serial.println("[BLE] Scanning started...");
-
     bleCount       = 0;
     _scanStartTime = millis();
     bleScanActive  = true;
-
     _pScan->clearResults();
 
-    bool ok = _pScan->start(0, false); 
-    if (!ok) {
+    if (!_pScan->start(0, false)) {
         Serial.println("[BLE] ERROR: scan start failed!");
         bleScanActive = false;
     }
@@ -232,13 +260,9 @@ void bleStopScan() {
 
 void bleCancelScan() {
     if (!_bleInitialised) return;
-    if (_pScan && bleScanActive) {
-        _pScan->stop();
-        delay(50);
-        _pScan->clearResults();
-    }
+    if (_pScan && bleScanActive) { _pScan->stop(); delay(50); _pScan->clearResults(); }
     bleScanActive = false;
-    bleCount      = 0;
+    bleCount = 0;
 }
 
 uint32_t bleScanStartTime() { return _scanStartTime; }
@@ -251,38 +275,28 @@ void bleStartRadar() {
     bleCount       = 0;
     _scanStartTime = millis();
     bleScanActive  = true;
-
     _pScan->clearResults();
     _pScan->start(0, false);
-
     Serial.println("[BLE] Radar scanning started.");
 }
 
 void bleStopRadar() {
     _radarMode = false;
-    if (_pScan && bleScanActive) {
-        _pScan->stop();
-        delay(50);
-    }
+    if (_pScan && bleScanActive) { _pScan->stop(); delay(50); }
     bleScanActive = false;
-    bleCount      = 0;
+    bleCount = 0;
     Serial.println("[BLE] Radar scanning stopped.");
 }
 
 void bleForceSweep() {
     if (!_bleInitialised || !_radarMode || !_pScan) return;
-    if (bleScanActive) {
-        _pScan->stop();
-        delay(50);
-    }
+    if (bleScanActive) { _pScan->stop(); delay(50); }
     bleScanActive  = false;
     bleCount       = 0;
     _scanStartTime = millis();
-
     _pScan->clearResults();
     bleScanActive = true;
     _pScan->start(0, false);
-
     Serial.println("[BLE] Forced sweep started.");
 }
 
@@ -324,6 +338,19 @@ int bleAlertCount() {
 
 bool bleHasAlerts() { return bleAlertCount() > 0; }
 
+void bleGetSortedIndices(int* idx, int count) {
+    for (int i = 0; i < count; i++) idx[i] = i;
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = i + 1; j < count; j++) {
+            if (bleResults[idx[j]].rssi > bleResults[idx[i]].rssi) {
+                int tmp = idx[i];
+                idx[i] = idx[j];
+                idx[j] = tmp;
+            }
+        }
+    }
+}
+
 void blePrintInfo() {
     if (bleCount == 0) { Serial.println("[BLE] No devices found."); return; }
 
@@ -334,15 +361,12 @@ void blePrintInfo() {
 
     for (int i = 0; i < bleCount; i++) {
         const BLEResult& r = bleResults[i];
-        Serial.printf("[BLE]  %2d: %s\n", i + 1, r.address.c_str());
-        Serial.printf("[BLE]      Name: %s\n",  r.name.isEmpty() ? "?" : r.name.c_str());
-        Serial.printf("[BLE]      Mfr:  %s\n",  r.manufacturer.c_str());
-        Serial.printf("[BLE]      Type: %s\n",  r.deviceType.c_str());
-        Serial.printf("[BLE]      RSSI: %d dBm\n", r.rssi);
-        Serial.printf("[BLE]      Addr: %s%s%s\n",
-            r.isPublicAddr ? "Public" : "Random",
-            r.isKnown      ? " [KNOWN]"  : "",
-            r.isAlert      ? " [!ALERT]" : "");
+        String displayName = !r.name.isEmpty() ? r.name : r.deviceType;
+        Serial.printf("[BLE]  %2d: %-20s | %-25s | %-15s | %d dBm%s%s\n",
+            i + 1, r.address.c_str(), displayName.c_str(),
+            r.manufacturer.c_str(), r.rssi,
+            r.isKnown ? " [KNOWN]" : "",
+            r.isAlert ? " [!ALERT]" : "");
     }
     Serial.println("[BLE] ==========================================\n");
 }
@@ -358,12 +382,10 @@ void blePrintAlerts() {
     for (int i = 0; i < bleCount; i++) {
         if (!bleResults[i].isAlert) continue;
         const BLEResult& r = bleResults[i];
-        Serial.printf("[BLE] ! %s\n",        r.alertLabel.c_str());
-        Serial.printf("[BLE] !   Addr: %s\n", r.address.c_str());
-        Serial.printf("[BLE]  !   Name: %s\n", r.name.isEmpty() ? "?" : r.name.c_str());
-        Serial.printf("[BLE] !   Mfr:  %s\n", r.manufacturer.c_str());
-        Serial.printf("[BLE] !   RSSI: %d dBm\n", r.rssi);
-        Serial.println("[BLE] !");
+        Serial.printf("[BLE] ! %-20s | %s | %s | %d dBm\n",
+            r.alertLabel.c_str(), r.address.c_str(),
+            r.name.isEmpty() ? r.deviceType.c_str() : r.name.c_str(),
+            r.rssi);
     }
     Serial.println("[BLE] ------------------------------------------\n");
 }

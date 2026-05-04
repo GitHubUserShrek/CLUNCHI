@@ -2,37 +2,39 @@
 #include <Arduino.h>
 
 struct BLEResult {
-String address;
-String name;
-int rssi;
-bool isKnown;
-String manufacturer; 
-String deviceType; 
-bool isAlert; 
-String alertLabel; 
-String signal; 
-bool isPublicAddr; 
+    String address;
+    String name;
+    int    rssi;
+    bool   isKnown;
+    String manufacturer;
+    String deviceType;
+    bool   isAlert;
+    String alertLabel;
+    String signal;
+    bool   isPublicAddr;
 };
 
-extern BLEResult bleResults[20];
-extern int bleCount;
-extern bool bleScanActive;
+extern BLEResult bleResults[40];
+extern int       bleCount;
+extern bool      bleScanActive;
 
-void bleBegin();
-void bleDeinit();
-void bleUpdate();
-bool isBleInitialised();
+void bleGetSortedIndices(int* idx, int count);
 
-void bleStartScan();
-void bleStopScan();
-void bleCancelScan();
+void     bleBegin();
+void     bleDeinit();
+void     bleUpdate();
+bool     isBleInitialised();
+
+void     bleStartScan();
+void     bleStopScan();
+void     bleCancelScan();
 uint32_t bleScanStartTime();
 
-int bleAlertCount();
-bool bleHasAlerts();
-void blePrintInfo();
-void blePrintAlerts();
+int      bleAlertCount();
+bool     bleHasAlerts();
+void     blePrintInfo();
+void     blePrintAlerts();
 
-void bleStartRadar();
-void bleStopRadar();
-void bleForceSweep();
+void     bleStartRadar();
+void     bleStopRadar();
+void     bleForceSweep();

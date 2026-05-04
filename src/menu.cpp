@@ -379,24 +379,43 @@ static void drawWardrivingScreen() {
 static void drawBleScanScreen() {
     if (bleScanActive) {
         uint32_t elapsed = (millis() - bleScanStartTime()) / 1000;
-        char l1[32];
+        char l1[32], l2[32];
         snprintf(l1, 31, "Scanning... %lus",
                  (unsigned int)((BLE_SCAN_DURATION / 1000) - elapsed));
-        const char* itm[] = { l1, "Hold: Cancel" };
-        display.drawMenu("BLE SCAN", itm, 2, -1);
-    } else if (bleCount > 0) {
-        char l1[32], l2[32], l3[32];
-        snprintf(l1, 31, "%d/%d: %s", bleMenuCursor + 1, bleCount,
-            bleResults[bleMenuCursor].name.isEmpty()
-                ? "Unknown"
-                : bleResults[bleMenuCursor].name.c_str());
-        snprintf(l2, 31, "%s", bleResults[bleMenuCursor].address.c_str());
-        snprintf(l3, 31, "RSSI: %d dBm%s",
-            bleResults[bleMenuCursor].rssi,
-            bleResults[bleMenuCursor].isAlert ? " ALERT" : "");
-        const char* itm[] = { l1, l2, l3, "Hold: Back" };
-        display.drawMenu("BLE RESULTS", itm, 4, -1);
-    } else {
+        snprintf(l2, 31, "Found: %d", bleCount);
+        const char* itm[] = { l1, l2, "Hold: Cancel" };
+        display.drawMenu("BLE SCAN", itm, 3, -1);
+    }
+    else if (bleCount > 0) {
+        int idx[40];
+        bleGetSortedIndices(idx, bleCount);
+        int sortedIdx = idx[bleMenuCursor];
+
+        const BLEResult& r = bleResults[sortedIdx];
+
+        char title[20];
+        char l1[32], l2[32], l3[32], l4[32];
+
+        String primary;
+        if (!r.name.isEmpty()) primary = r.name;
+        else if (!r.deviceType.isEmpty()) primary = r.deviceType;
+        else primary = "Unknown Device";
+
+        String manufacturer = r.manufacturer.isEmpty() ? "Unknown" : r.manufacturer;
+        const char* addrType = r.isPublicAddr ? "Public" : "Private";
+
+        snprintf(title, sizeof(title), "BLE %d/%d", bleMenuCursor + 1, bleCount);
+        snprintf(l1, 31, "%s", primary.c_str());
+        snprintf(l2, 31, "%s", manufacturer.c_str());
+        snprintf(l3, 31, "RSSI:%d %s%s",
+                 r.rssi, addrType,
+                 r.isAlert ? " ALERT" : "");
+        snprintf(l4, 31, "%s", r.address.c_str());
+
+        const char* itm[] = { l1, l2, l3, l4 };
+        display.drawMenu(title, itm, 4, -1);
+    }
+    else {
         const char* itm[] = { "No devices", "Hold: Back" };
         display.drawMenu("BLE SCAN", itm, 2, -1);
     }

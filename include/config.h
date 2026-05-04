@@ -24,8 +24,8 @@
 #define SD_MISO 7
 #define SD_SCK  8
 //GPS
-#define GPS_RX_PIN 3
-#define GPS_TX_PIN 4
+#define GPS_RX_PIN 4
+#define GPS_TX_PIN 3
 #define GPS_BAUD   9600
 
 

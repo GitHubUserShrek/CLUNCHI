@@ -4,10 +4,9 @@
 #include "wifi_manager.h"
 #include <WiFi.h>
 #include <SD.h>
-#include <new>
 
-#define WD_SCAN_INTERVAL_MS   10000
-#define WD_MAX_NETWORKS       50
+#define WD_SCAN_INTERVAL_MS   3000
+#define WD_MAX_NETWORKS       60
 
 bool     wardrivingActive         = false;
 uint32_t wardrivingNetworksLogged = 0;
