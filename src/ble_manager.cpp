@@ -240,7 +240,6 @@ static void logAlertsToSD() {
         if (!bleResults[i].isAlert) continue;
         const BLEResult& r = bleResults[i];
 
-        // Sanitise commas for CSV
         String name  = r.name.isEmpty()         ? "Unknown" : r.name;
         String mfr   = r.manufacturer.isEmpty()  ? "Unknown" : r.manufacturer;
         String label = r.alertLabel;
