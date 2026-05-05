@@ -6,7 +6,6 @@
 #include "gps_manager.h"
 #include <SD.h>
 
-// ─── Alert Rules ─────────────────────────────────────────────────────────────
 struct BLEAlertRule {
     const char* nameContains;
     const char* ouiPrefix;
@@ -27,7 +26,6 @@ static const BLEAlertRule alertRules[] = {
 
 static const int alertRuleCount = sizeof(alertRules) / sizeof(alertRules[0]);
 
-// ─── Globals ─────────────────────────────────────────────────────────────────
 BLEResult bleResults[40];
 int       bleCount      = 0;
 bool      bleScanActive = false;
@@ -39,7 +37,6 @@ static bool           _radarMode      = false;
 static const uint32_t RADAR_SWEEP_MS  = 5000;
 uint32_t bleAlertsLoggedTotal = 0;
 
-// ─── Device Type Builder ─────────────────────────────────────────────────────
 static String buildDeviceType(const NimBLEAdvertisedDevice* device,
                                const String& addr, bool isPublic,
                                String& outManufacturer) {
@@ -93,7 +90,6 @@ static String buildDeviceType(const NimBLEAdvertisedDevice* device,
     return isPublic ? "Unknown Device" : "Unknown Device";
 }
 
-// ─── Alert Checker ───────────────────────────────────────────────────────────
 static bool checkAlert(const String& addr, const String& name,
                        const NimBLEAdvertisedDevice* device,
                        String& outLabel) {
@@ -137,7 +133,6 @@ static bool checkAlert(const String& addr, const String& name,
     return false;
 }
 
-// ─── Scan Callback ───────────────────────────────────────────────────────────
 class ScanCallback : public NimBLEScanCallbacks {
 public:
     void onResult(const NimBLEAdvertisedDevice* device) override {
@@ -202,7 +197,6 @@ public:
 
 static ScanCallback _scanCallback;
 
-// ─── SD Logging (every alert, every sweep, no dedup) ─────────────────────────
 static void logAlertsToSD() {
     if (!sdActive) return;
 
@@ -279,7 +273,6 @@ static void logAlertsToSD() {
     Serial.printf("[BLE Log] %d alert(s) saved to %s\n", alertCount, pathBuf);
 }
 
-// ─── Init / Deinit ───────────────────────────────────────────────────────────
 void bleBegin() {
     if (_bleInitialised) return;
     Serial.println("[BLE] Radio Initializing...");
@@ -321,7 +314,6 @@ void bleDeinit() {
 
 bool isBleInitialised() { return _bleInitialised; }
 
-// ─── Scan Control ────────────────────────────────────────────────────────────
 void bleStartScan() {
     if (!_bleInitialised) { Serial.println("[BLE] Error: Call bleBegin first."); return; }
     if (bleScanActive) return;
@@ -355,7 +347,6 @@ void bleCancelScan() {
 
 uint32_t bleScanStartTime() { return _scanStartTime; }
 
-// ─── Radar Control ───────────────────────────────────────────────────────────
 void bleStartRadar() {
     if (!_bleInitialised) bleBegin();
     if (!_pScan) return;
@@ -390,7 +381,6 @@ void bleForceSweep() {
     Serial.println("[BLE] Forced sweep started.");
 }
 
-// ─── Main Update Loop ────────────────────────────────────────────────────────
 void bleUpdate() {
     if (!_bleInitialised || !_pScan) return;
 
@@ -429,7 +419,6 @@ void bleUpdate() {
     }
 }
 
-// ─── Utility ─────────────────────────────────────────────────────────────────
 int bleAlertCount() {
     int count = 0;
     for (int i = 0; i < bleCount; i++) if (bleResults[i].isAlert) count++;

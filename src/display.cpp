@@ -253,7 +253,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
     }
 
-    // ─── Mouths ──────────────────────────────────────────────────────────
     if (anim.spiralEyes && anim.dribbling) {
         int wave = (int)(sin(millis() / 200.0f) * 3.0f);
         u8g2_.drawLine(mouthCX - 12, mouthY + wave, mouthCX - 6, mouthY - wave);
@@ -334,7 +333,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawHLine(mouthCX - 10, mouthY, 20);
     }
 
-    // ─── Decorations ─────────────────────────────────────────────────────
     if (!anim.dribbling) {
         if (currentMood == HAPPY)   drawHappySparkles();
         if (currentMood == SLEEPY && (millis() / 500) % 2) drawSleepZzz(millis() / 300);
@@ -347,18 +345,15 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
     }
 
-    // ─── Frame ───────────────────────────────────────────────────────────
     if (currentMood == ENRAGED) {
         u8g2_.drawFrame(0, 0, OLED_WIDTH, OLED_HEIGHT);
     } else {
         u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
     }
 
-    // ─── VIGILANT HUD ───────────────────────────────────────────────────
     if (currentMood == VIGILANT) {
         u8g2_.setFont(u8g2_font_5x7_tr);
 
-        // Persistent alert count bottom-left
         char alertBuf[12];
         if (bleAlertsLoggedTotal > 0) {
             snprintf(alertBuf, sizeof(alertBuf), "%lu", (unsigned long)bleAlertsLoggedTotal);
@@ -367,64 +362,49 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
         u8g2_.drawStr(5, 60, alertBuf);
 
-         // Flashing Siren Bulb (only if alerts exist)
         if (bleAlertsLoggedTotal > 0) {
-            int sx = 5 + (strlen(alertBuf) * 5) + 6; // Position next to text
-            int sy = 59; // Increased from 56 to 59 to move it down 3 pixels
+            int sx = 5 + (strlen(alertBuf) * 5) + 6; 
+            int sy = 59; 
             bool isLit = (millis() / 300) % 2; 
 
-            // 1. Base of the siren
             u8g2_.drawHLine(sx - 1, sy, 9);
 
             if (isLit) {
-                // LIT: Solid tall dome
-                // Body (x, y, w, h)
                 u8g2_.drawBox(sx, sy - 4, 7, 4); 
-                // Top cap
                 u8g2_.drawHLine(sx + 1, sy - 5, 5);
                 
-                // Light Emit Lines (Rays)
-                u8g2_.drawPixel(sx + 3, sy - 7); // Top
-                u8g2_.drawPixel(sx - 2, sy - 2); // Left
-                u8g2_.drawPixel(sx + 8, sy - 2); // Right
+                u8g2_.drawPixel(sx + 3, sy - 7);
+                u8g2_.drawPixel(sx - 2, sy - 2);
+                u8g2_.drawPixel(sx + 8, sy - 2); 
             } else {
-                // OFF: Hollow tall dome
-                u8g2_.drawVLine(sx, sy - 4, 4);      // Left wall
-                u8g2_.drawVLine(sx + 6, sy - 4, 4);  // Right wall
-                u8g2_.drawHLine(sx + 1, sy - 5, 5);  // Top flat
-                u8g2_.drawPixel(sx + 1, sy - 4);     // Corner
-                u8g2_.drawPixel(sx + 5, sy - 4);     // Corner
+                u8g2_.drawVLine(sx, sy - 4, 4);     
+                u8g2_.drawVLine(sx + 6, sy - 4, 4);  
+                u8g2_.drawHLine(sx + 1, sy - 5, 5);  
+                u8g2_.drawPixel(sx + 1, sy - 4);    
+                u8g2_.drawPixel(sx + 5, sy - 4);     
             }
         }
 
-        // Device count bottom-right
         char devBuf[8];
         snprintf(devBuf, sizeof(devBuf), "%d", bleCount);
         int devW = strlen(devBuf) * 5;
         u8g2_.drawStr(OLED_WIDTH - devW - 14, 60, devBuf);
 
-           // BLE Icon
         int bx = OLED_WIDTH - 10;
         int by = 54;
 
-        // 1. Vertical spine (the 'middle' of the B)
         u8g2_.drawVLine(bx, by - 1, 9);
 
-        // 2. Right side (Front - Two sharp triangles)
-        // Top triangle
         u8g2_.drawLine(bx, by, bx + 5, by + 2);
         u8g2_.drawLine(bx + 5, by + 2, bx, by + 3);
 
-        // Bottom triangle
         u8g2_.drawLine(bx, by + 3, bx + 5, by + 4);
         u8g2_.drawLine(bx + 5, by + 4, bx, by + 6);
 
-        // 3. Left side (Back chevrons - Anchored to middle of stem)
-        u8g2_.drawLine(bx - 2, by, bx, by + 2);      // Top-Left corner to middle of stem
-        u8g2_.drawLine(bx - 2, by + 6, bx, by + 4);  // Bottom-Left corner to middle of stem
+        u8g2_.drawLine(bx - 2, by, bx, by + 2);     
+        u8g2_.drawLine(bx - 2, by + 6, bx, by + 4);  
     }
 
-    // ─── DRIVING HUD ────────────────────────────────────────────────────
     if (currentMood == DRIVING) {
         u8g2_.setFont(u8g2_font_5x7_tr);
 
