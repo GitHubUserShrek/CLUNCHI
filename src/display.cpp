@@ -1,6 +1,7 @@
 #include "display.h"
 #include "wardriving.h"
 #include "gps_manager.h"
+#include "ble_manager.h"
 #include <Wire.h>
 
 bool Display::begin() {
@@ -37,10 +38,10 @@ void Display::drawSplash() {
 }
 
 void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
-    const int   arms       = 2;    
-    const float armSpacing = 3.5f;   
-    const float thetaStep  = 0.15f;  
-    const float maxTheta   = radius * (2.0f * PI) / armSpacing; 
+    const int   arms       = 2;
+    const float armSpacing = 3.5f;
+    const float thetaStep  = 0.15f;
+    const float maxTheta   = radius * (2.0f * PI) / armSpacing;
 
     for (int arm = 0; arm < arms; arm++) {
         float armOffset = arm * (2.0f * PI / arms);
@@ -48,7 +49,7 @@ void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
         for (float theta = 0.5f; theta < maxTheta; theta += thetaStep) {
             float r = (armSpacing / (2.0f * PI)) * theta;
 
-            if (r > radius) break; 
+            if (r > radius) break;
 
             float drawAngle = theta + angle + armOffset;
 
@@ -62,7 +63,6 @@ void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
     }
 
     u8g2_.drawDisc(cx, cy, 1);
-
     u8g2_.drawCircle(cx, cy, radius);
 }
 
@@ -85,7 +85,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
     int eyeYLeft  = baseEyeY + offsetY + leftEyeYOff;
     int eyeYRight = baseEyeY + offsetY + rightEyeYOff;
     int mouthY    = 46 + offsetY + mouthYOff;
-    int mouthCX   = 64 + mouthXOff; 
+    int mouthCX   = 64 + mouthXOff;
 
     int eyeHeight = eyeR * 2;
     if (anim.blink > 0) {
@@ -156,7 +156,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
     }
     else if (currentMood == DRIVING) {
         uint32_t now = millis();
-        float cycle = fmod(now / 4000.0f, 1.0f); 
+        float cycle = fmod(now / 4000.0f, 1.0f);
 
         if (cycle > 0.4f && cycle < 0.6f) {
             float winkPhase = (cycle - 0.4f) / 0.2f;
@@ -253,6 +253,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
     }
 
+    // ─── Mouths ──────────────────────────────────────────────────────────
     if (anim.spiralEyes && anim.dribbling) {
         int wave = (int)(sin(millis() / 200.0f) * 3.0f);
         u8g2_.drawLine(mouthCX - 12, mouthY + wave, mouthCX - 6, mouthY - wave);
@@ -293,7 +294,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawPixel(mouthCX - 9, mouthY + 1);
         u8g2_.drawPixel(mouthCX + 8, mouthY + 1);
         u8g2_.drawPixel(mouthCX + 9, mouthY + 1);
-    }     
+    }
     else if (currentMood == DRIVING) {
         uint32_t now = millis();
         float smirkCycle = fmod(now / 5000.0f, 1.0f);
@@ -314,7 +315,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawLine(endX + 2, endY - 2, endX + 3, endY);
         u8g2_.drawLine(endX + 3, endY, endX + 2, endY + 2);
         u8g2_.drawLine(endX + 2, endY + 2, endX, endY + 4);
-
     }
     else if (currentMood == ENRAGED) {
         u8g2_.drawLine(mouthCX - 14, mouthY, mouthCX - 9, mouthY - 4);
@@ -334,6 +334,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawHLine(mouthCX - 10, mouthY, 20);
     }
 
+    // ─── Decorations ─────────────────────────────────────────────────────
     if (!anim.dribbling) {
         if (currentMood == HAPPY)   drawHappySparkles();
         if (currentMood == SLEEPY && (millis() / 500) % 2) drawSleepZzz(millis() / 300);
@@ -346,12 +347,84 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         }
     }
 
+    // ─── Frame ───────────────────────────────────────────────────────────
     if (currentMood == ENRAGED) {
         u8g2_.drawFrame(0, 0, OLED_WIDTH, OLED_HEIGHT);
     } else {
         u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
     }
 
+    // ─── VIGILANT HUD ───────────────────────────────────────────────────
+    if (currentMood == VIGILANT) {
+        u8g2_.setFont(u8g2_font_5x7_tr);
+
+        // Persistent alert count bottom-left
+        char alertBuf[12];
+        if (bleAlertsLoggedTotal > 0) {
+            snprintf(alertBuf, sizeof(alertBuf), "%lu", (unsigned long)bleAlertsLoggedTotal);
+        } else {
+            strcpy(alertBuf, "0");
+        }
+        u8g2_.drawStr(5, 60, alertBuf);
+
+         // Flashing Siren Bulb (only if alerts exist)
+        if (bleAlertsLoggedTotal > 0) {
+            int sx = 5 + (strlen(alertBuf) * 5) + 6; // Position next to text
+            int sy = 59; // Increased from 56 to 59 to move it down 3 pixels
+            bool isLit = (millis() / 300) % 2; 
+
+            // 1. Base of the siren
+            u8g2_.drawHLine(sx - 1, sy, 9);
+
+            if (isLit) {
+                // LIT: Solid tall dome
+                // Body (x, y, w, h)
+                u8g2_.drawBox(sx, sy - 4, 7, 4); 
+                // Top cap
+                u8g2_.drawHLine(sx + 1, sy - 5, 5);
+                
+                // Light Emit Lines (Rays)
+                u8g2_.drawPixel(sx + 3, sy - 7); // Top
+                u8g2_.drawPixel(sx - 2, sy - 2); // Left
+                u8g2_.drawPixel(sx + 8, sy - 2); // Right
+            } else {
+                // OFF: Hollow tall dome
+                u8g2_.drawVLine(sx, sy - 4, 4);      // Left wall
+                u8g2_.drawVLine(sx + 6, sy - 4, 4);  // Right wall
+                u8g2_.drawHLine(sx + 1, sy - 5, 5);  // Top flat
+                u8g2_.drawPixel(sx + 1, sy - 4);     // Corner
+                u8g2_.drawPixel(sx + 5, sy - 4);     // Corner
+            }
+        }
+
+        // Device count bottom-right
+        char devBuf[8];
+        snprintf(devBuf, sizeof(devBuf), "%d", bleCount);
+        int devW = strlen(devBuf) * 5;
+        u8g2_.drawStr(OLED_WIDTH - devW - 14, 60, devBuf);
+
+           // BLE Icon
+        int bx = OLED_WIDTH - 10;
+        int by = 54;
+
+        // 1. Vertical spine (the 'middle' of the B)
+        u8g2_.drawVLine(bx, by - 1, 9);
+
+        // 2. Right side (Front - Two sharp triangles)
+        // Top triangle
+        u8g2_.drawLine(bx, by, bx + 5, by + 2);
+        u8g2_.drawLine(bx + 5, by + 2, bx, by + 3);
+
+        // Bottom triangle
+        u8g2_.drawLine(bx, by + 3, bx + 5, by + 4);
+        u8g2_.drawLine(bx + 5, by + 4, bx, by + 6);
+
+        // 3. Left side (Back chevrons - Anchored to middle of stem)
+        u8g2_.drawLine(bx - 2, by, bx, by + 2);      // Top-Left corner to middle of stem
+        u8g2_.drawLine(bx - 2, by + 6, bx, by + 4);  // Bottom-Left corner to middle of stem
+    }
+
+    // ─── DRIVING HUD ────────────────────────────────────────────────────
     if (currentMood == DRIVING) {
         u8g2_.setFont(u8g2_font_5x7_tr);
 
@@ -484,7 +557,6 @@ void Display::drawAlertMarks() {
         u8g2_.drawStr(6, 58, "!");
     }
 }
-
 
 void Display::drawMenu(const char* title, const char** items, uint8_t itemCount, int selectedIdx, int arrowIdx) {
     clear();

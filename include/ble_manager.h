@@ -18,6 +18,8 @@ extern BLEResult bleResults[40];
 extern int       bleCount;
 extern bool      bleScanActive;
 
+extern uint32_t bleAlertsLoggedTotal;
+
 void bleGetSortedIndices(int* idx, int count);
 
 void     bleBegin();

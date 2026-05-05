@@ -217,7 +217,7 @@ void exitRadar() {
 }
 
 static void _updateRadar(uint32_t now) {
-    const uint32_t THREAT_CLEAR_MS = 10000;
+    const uint32_t THREAT_CLEAR_MS = 5000;
 
     if (!isTouched) _radarTouchLock = false;
 
