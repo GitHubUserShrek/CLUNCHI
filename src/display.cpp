@@ -1,6 +1,7 @@
 #include "display.h"
 #include "wardriving.h"
 #include "gps_manager.h"
+#include "ble_manager.h"
 #include <Wire.h>
 
 bool Display::begin() {
@@ -37,10 +38,10 @@ void Display::drawSplash() {
 }
 
 void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
-    const int   arms       = 2;    
-    const float armSpacing = 3.5f;   
-    const float thetaStep  = 0.15f;  
-    const float maxTheta   = radius * (2.0f * PI) / armSpacing; 
+    const int   arms       = 2;
+    const float armSpacing = 3.5f;
+    const float thetaStep  = 0.15f;
+    const float maxTheta   = radius * (2.0f * PI) / armSpacing;
 
     for (int arm = 0; arm < arms; arm++) {
         float armOffset = arm * (2.0f * PI / arms);
@@ -48,7 +49,7 @@ void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
         for (float theta = 0.5f; theta < maxTheta; theta += thetaStep) {
             float r = (armSpacing / (2.0f * PI)) * theta;
 
-            if (r > radius) break; 
+            if (r > radius) break;
 
             float drawAngle = theta + angle + armOffset;
 
@@ -62,7 +63,6 @@ void Display::drawSpiralEye(int cx, int cy, int radius, float angle) {
     }
 
     u8g2_.drawDisc(cx, cy, 1);
-
     u8g2_.drawCircle(cx, cy, radius);
 }
 
@@ -85,7 +85,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
     int eyeYLeft  = baseEyeY + offsetY + leftEyeYOff;
     int eyeYRight = baseEyeY + offsetY + rightEyeYOff;
     int mouthY    = 46 + offsetY + mouthYOff;
-    int mouthCX   = 64 + mouthXOff; 
+    int mouthCX   = 64 + mouthXOff;
 
     int eyeHeight = eyeR * 2;
     if (anim.blink > 0) {
@@ -156,7 +156,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
     }
     else if (currentMood == DRIVING) {
         uint32_t now = millis();
-        float cycle = fmod(now / 4000.0f, 1.0f); 
+        float cycle = fmod(now / 4000.0f, 1.0f);
 
         if (cycle > 0.4f && cycle < 0.6f) {
             float winkPhase = (cycle - 0.4f) / 0.2f;
@@ -293,7 +293,7 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawPixel(mouthCX - 9, mouthY + 1);
         u8g2_.drawPixel(mouthCX + 8, mouthY + 1);
         u8g2_.drawPixel(mouthCX + 9, mouthY + 1);
-    }     
+    }
     else if (currentMood == DRIVING) {
         uint32_t now = millis();
         float smirkCycle = fmod(now / 5000.0f, 1.0f);
@@ -314,7 +314,6 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawLine(endX + 2, endY - 2, endX + 3, endY);
         u8g2_.drawLine(endX + 3, endY, endX + 2, endY + 2);
         u8g2_.drawLine(endX + 2, endY + 2, endX, endY + 4);
-
     }
     else if (currentMood == ENRAGED) {
         u8g2_.drawLine(mouthCX - 14, mouthY, mouthCX - 9, mouthY - 4);
@@ -350,6 +349,60 @@ void Display::drawFace(Mood currentMood, AnimState anim) {
         u8g2_.drawFrame(0, 0, OLED_WIDTH, OLED_HEIGHT);
     } else {
         u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+    }
+
+    if (currentMood == VIGILANT) {
+        u8g2_.setFont(u8g2_font_5x7_tr);
+
+        char alertBuf[12];
+        if (bleAlertsLoggedTotal > 0) {
+            snprintf(alertBuf, sizeof(alertBuf), "%lu", (unsigned long)bleAlertsLoggedTotal);
+        } else {
+            strcpy(alertBuf, "0");
+        }
+        u8g2_.drawStr(5, 60, alertBuf);
+
+        if (bleAlertsLoggedTotal > 0) {
+            int sx = 5 + (strlen(alertBuf) * 5) + 6; 
+            int sy = 59; 
+            bool isLit = (millis() / 300) % 2; 
+
+            u8g2_.drawHLine(sx - 1, sy, 9);
+
+            if (isLit) {
+                u8g2_.drawBox(sx, sy - 4, 7, 4); 
+                u8g2_.drawHLine(sx + 1, sy - 5, 5);
+                
+                u8g2_.drawPixel(sx + 3, sy - 7);
+                u8g2_.drawPixel(sx - 2, sy - 2);
+                u8g2_.drawPixel(sx + 8, sy - 2); 
+            } else {
+                u8g2_.drawVLine(sx, sy - 4, 4);     
+                u8g2_.drawVLine(sx + 6, sy - 4, 4);  
+                u8g2_.drawHLine(sx + 1, sy - 5, 5);  
+                u8g2_.drawPixel(sx + 1, sy - 4);    
+                u8g2_.drawPixel(sx + 5, sy - 4);     
+            }
+        }
+
+        char devBuf[8];
+        snprintf(devBuf, sizeof(devBuf), "%d", bleCount);
+        int devW = strlen(devBuf) * 5;
+        u8g2_.drawStr(OLED_WIDTH - devW - 14, 60, devBuf);
+
+        int bx = OLED_WIDTH - 10;
+        int by = 54;
+
+        u8g2_.drawVLine(bx, by - 1, 9);
+
+        u8g2_.drawLine(bx, by, bx + 5, by + 2);
+        u8g2_.drawLine(bx + 5, by + 2, bx, by + 3);
+
+        u8g2_.drawLine(bx, by + 3, bx + 5, by + 4);
+        u8g2_.drawLine(bx + 5, by + 4, bx, by + 6);
+
+        u8g2_.drawLine(bx - 2, by, bx, by + 2);     
+        u8g2_.drawLine(bx - 2, by + 6, bx, by + 4);  
     }
 
     if (currentMood == DRIVING) {
@@ -458,6 +511,80 @@ void Display::drawRadarSweep() {
     u8g2_.drawDisc(cx, cy, 1);
 }
 
+void Display::drawSpeedometer(double speed, const char* unit, bool hasFix, int sats) {
+    clear();
+
+    u8g2_.setDrawColor(1);
+    u8g2_.drawRBox(4, 2, OLED_WIDTH - 8, 48, 4);
+
+    u8g2_.setDrawColor(0); 
+
+    char speedBuf[8];
+    if (speed < 1.0) {
+        snprintf(speedBuf, sizeof(speedBuf), "0");
+    } else if (speed < 100.0) {
+        snprintf(speedBuf, sizeof(speedBuf), "%.0f", speed);
+    } else {
+        snprintf(speedBuf, sizeof(speedBuf), "%.0f", speed);
+    }
+
+    u8g2_.setFont(u8g2_font_logisoso28_tn);  
+    int numW = u8g2_.getStrWidth(speedBuf);
+    int numX = (OLED_WIDTH - numW) / 2;
+    u8g2_.drawStr(numX, 36, speedBuf);
+
+    u8g2_.setFont(u8g2_font_7x14B_tr);  
+    int unitW = u8g2_.getStrWidth(unit);
+    int unitX = (OLED_WIDTH - unitW) / 2;
+    u8g2_.drawStr(unitX, 48, unit);
+
+    u8g2_.setDrawColor(1); 
+    u8g2_.setFont(u8g2_font_5x7_tr);
+
+    if (hasFix) {
+        char satBuf[16];
+        snprintf(satBuf, sizeof(satBuf), "FIX %dS", sats);
+        u8g2_.drawStr(4, 62, satBuf);
+    } else {
+        u8g2_.drawStr(4, 62, "NO FIX");
+    }
+
+    u8g2_.drawStr(78, 62, "Tap:Unit");
+
+    u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+
+    render();
+}
+
+void Display::drawClock(const char* time, const char* date, const char* timezone) {
+    clear();
+
+    u8g2_.setDrawColor(1);
+    u8g2_.drawRBox(4, 2, OLED_WIDTH - 8, 38, 4);
+
+    u8g2_.setDrawColor(0); 
+    u8g2_.setFont(u8g2_font_logisoso20_tr);  
+    int timeW = u8g2_.getStrWidth(time);
+    int timeX = (OLED_WIDTH - timeW) / 2;
+    u8g2_.drawStr(timeX, 32, time);
+
+
+    u8g2_.setDrawColor(1);
+    u8g2_.setFont(u8g2_font_7x14B_tr); 
+    int dateW = u8g2_.getStrWidth(date);
+    int dateX = (OLED_WIDTH - dateW) / 2;
+    u8g2_.drawStr(dateX, 52, date);
+
+    u8g2_.setFont(u8g2_font_5x7_tr);
+    u8g2_.drawStr(4, 62, timezone);
+
+    u8g2_.drawStr(82, 62, "Hold:Back");
+
+    u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+
+    render();
+}
+
 void Display::drawAngryAura() {
     if ((millis() / 120) % 3 == 0) return;
     u8g2_.drawLine(25, 2, 28, 0);
@@ -484,7 +611,6 @@ void Display::drawAlertMarks() {
         u8g2_.drawStr(6, 58, "!");
     }
 }
-
 
 void Display::drawMenu(const char* title, const char** items, uint8_t itemCount, int selectedIdx, int arrowIdx) {
     clear();
