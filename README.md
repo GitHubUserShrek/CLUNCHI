@@ -120,4 +120,6 @@ The dashboard currently includes:
 - expanded BLE scanning and alerting
 - dashboard improvements
 
+- Legal Disclaimer: This device is not a substitute for a factory-certified speedometer and should not be used as primary evidence for speed compliance.
+
 
