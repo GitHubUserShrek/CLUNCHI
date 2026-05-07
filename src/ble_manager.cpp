@@ -211,7 +211,11 @@ static void logAlertsToSD() {
     }
 
     char dateBuf[16];
-    if (gpsData.year > 2000) {
+    LocalTime lt = gpsGetLocalTime();
+    if (lt.valid) {
+        snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d",
+                 lt.year, lt.month, lt.day);
+    } else if (gpsData.year > 2000) {
         snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d",
                  gpsData.year, gpsData.month, gpsData.day);
     } else {
@@ -233,8 +237,13 @@ static void logAlertsToSD() {
     }
 
     char timeBuf[16];
-    snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d",
-             gpsData.hour, gpsData.minute, gpsData.second);
+    if (lt.valid) {
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d",
+                 lt.hour, lt.minute, lt.second);
+    } else {
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d",
+                 gpsData.hour, gpsData.minute, gpsData.second);
+    }
 
     for (int i = 0; i < bleCount; i++) {
         if (!bleResults[i].isAlert) continue;

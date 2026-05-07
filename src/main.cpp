@@ -58,7 +58,7 @@ static void handlePeriodicLog(uint32_t now) {
             (unsigned long)secs,
             netGradeLabel(nhStats.grade));
     } else {
-        Serial.println("[CLUNCHI] WiFi:-- | IP:0.0.0.0");
+        Serial.println("[CLUNCHI] Take me to your WiFi");
     }
 }
 
@@ -82,6 +82,7 @@ void setup() {
 
     wifiBegin();
     gpsBegin();
+    gpsLoadTimeSettings(); 
     sdBegin();
 
     display.drawSplash();

@@ -131,6 +131,13 @@ static void checkAndRotateSession() {
 }
 
 static String getDateString() {
+    LocalTime lt = gpsGetLocalTime();
+    if (lt.valid) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%04d%02d%02d",
+                 lt.year, lt.month, lt.day);
+        return String(buf);
+    }
     if (gpsData.year > 0) {
         char buf[16];
         snprintf(buf, sizeof(buf), "%04d%02d%02d",
@@ -141,9 +148,15 @@ static String getDateString() {
 }
 
 static String getTimeString() {
+    LocalTime lt = gpsGetLocalTime();
     char buf[16];
-    snprintf(buf, sizeof(buf), "%02d:%02d:%02d",
-             gpsData.hour, gpsData.minute, gpsData.second);
+    if (lt.valid) {
+        snprintf(buf, sizeof(buf), "%02d:%02d:%02d",
+                 lt.hour, lt.minute, lt.second);
+    } else {
+        snprintf(buf, sizeof(buf), "%02d:%02d:%02d",
+                 gpsData.hour, gpsData.minute, gpsData.second);
+    }
     return String(buf);
 }
 
@@ -281,10 +294,17 @@ void wardrivingBegin() {
     _sessionPart             = 0;
     clearSeen();
 
+    LocalTime lt = gpsGetLocalTime();
     char ts[32];
-    snprintf(ts, sizeof(ts), "%04d%02d%02d_%02d%02d%02d",
-             gpsData.year, gpsData.month, gpsData.day,
-             gpsData.hour, gpsData.minute, gpsData.second);
+    if (lt.valid) {
+        snprintf(ts, sizeof(ts), "%04d%02d%02d_%02d%02d%02d",
+                 lt.year, lt.month, lt.day,
+                 lt.hour, lt.minute, lt.second);
+    } else {
+        snprintf(ts, sizeof(ts), "%04d%02d%02d_%02d%02d%02d",
+                 gpsData.year, gpsData.month, gpsData.day,
+                 gpsData.hour, gpsData.minute, gpsData.second);
+    }
     _sessionTimestamp = String(ts);
 
     Serial.println("[Wardriving] ==========================================");

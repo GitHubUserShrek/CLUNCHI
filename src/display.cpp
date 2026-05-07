@@ -511,6 +511,80 @@ void Display::drawRadarSweep() {
     u8g2_.drawDisc(cx, cy, 1);
 }
 
+void Display::drawSpeedometer(double speed, const char* unit, bool hasFix, int sats) {
+    clear();
+
+    u8g2_.setDrawColor(1);
+    u8g2_.drawRBox(4, 2, OLED_WIDTH - 8, 48, 4);
+
+    u8g2_.setDrawColor(0); 
+
+    char speedBuf[8];
+    if (speed < 1.0) {
+        snprintf(speedBuf, sizeof(speedBuf), "0");
+    } else if (speed < 100.0) {
+        snprintf(speedBuf, sizeof(speedBuf), "%.0f", speed);
+    } else {
+        snprintf(speedBuf, sizeof(speedBuf), "%.0f", speed);
+    }
+
+    u8g2_.setFont(u8g2_font_logisoso28_tn);  
+    int numW = u8g2_.getStrWidth(speedBuf);
+    int numX = (OLED_WIDTH - numW) / 2;
+    u8g2_.drawStr(numX, 36, speedBuf);
+
+    u8g2_.setFont(u8g2_font_7x14B_tr);  
+    int unitW = u8g2_.getStrWidth(unit);
+    int unitX = (OLED_WIDTH - unitW) / 2;
+    u8g2_.drawStr(unitX, 48, unit);
+
+    u8g2_.setDrawColor(1); 
+    u8g2_.setFont(u8g2_font_5x7_tr);
+
+    if (hasFix) {
+        char satBuf[16];
+        snprintf(satBuf, sizeof(satBuf), "FIX %dS", sats);
+        u8g2_.drawStr(4, 62, satBuf);
+    } else {
+        u8g2_.drawStr(4, 62, "NO FIX");
+    }
+
+    u8g2_.drawStr(78, 62, "Tap:Unit");
+
+    u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+
+    render();
+}
+
+void Display::drawClock(const char* time, const char* date, const char* timezone) {
+    clear();
+
+    u8g2_.setDrawColor(1);
+    u8g2_.drawRBox(4, 2, OLED_WIDTH - 8, 38, 4);
+
+    u8g2_.setDrawColor(0); 
+    u8g2_.setFont(u8g2_font_logisoso20_tr);  
+    int timeW = u8g2_.getStrWidth(time);
+    int timeX = (OLED_WIDTH - timeW) / 2;
+    u8g2_.drawStr(timeX, 32, time);
+
+
+    u8g2_.setDrawColor(1);
+    u8g2_.setFont(u8g2_font_7x14B_tr); 
+    int dateW = u8g2_.getStrWidth(date);
+    int dateX = (OLED_WIDTH - dateW) / 2;
+    u8g2_.drawStr(dateX, 52, date);
+
+    u8g2_.setFont(u8g2_font_5x7_tr);
+    u8g2_.drawStr(4, 62, timezone);
+
+    u8g2_.drawStr(82, 62, "Hold:Back");
+
+    u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+
+    render();
+}
+
 void Display::drawAngryAura() {
     if ((millis() / 120) % 3 == 0) return;
     u8g2_.drawLine(25, 2, 28, 0);
