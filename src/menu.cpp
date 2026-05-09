@@ -9,6 +9,7 @@
 #include "wardriving.h"
 #include "sd_manager.h"
 #include "gps_manager.h"
+#include "tilt.h"
 #include <Preferences.h>
 #include <algorithm>
 
@@ -31,9 +32,32 @@ static bool bleMenuScanning = false;
 
 static int  gpsMenuCursor   = 0;
 static int  gpsSatPage      = 0;
-static int  gpsSpeedUnit    = 0;   
+static int  gpsSpeedUnit    = 0;
 
-static int  settTimezone     = 0;  
+static int  settTimezone     = 0;
+
+struct DieType {
+    const char* label;
+    int         sides;
+};
+
+static const DieType diceTypes[] = {
+    { "D4",   4   },
+    { "D6",   6   },
+    { "D8",   8   },
+    { "D10",  10  },
+    { "D12",  12  },
+    { "D20",  20  },
+    { "D100", 100 }
+};
+static const int diceTypeCount = sizeof(diceTypes) / sizeof(diceTypes[0]);
+
+static int      diceCursor      = 5;     
+static int      diceResult      = 0;
+static bool     diceRolling     = false;
+static uint32_t diceRollStart   = 0;
+static int      diceRollFrame   = 0;
+static const uint32_t DICE_ROLL_DURATION = 800;
 
 static Preferences prefs;
 static int         sleepTimerCursor    = 1;
@@ -81,6 +105,9 @@ static void act_mute();
 static void act_sleep_timer();
 static void act_timezone();
 static void act_dst_toggle();
+static void act_tilt_toggle();
+static void act_games();
+static void act_dice();
 static void act_reboot();
 
 static void drawWifiScanScreen();
@@ -95,24 +122,27 @@ static void drawGpsStatusScreen();
 static void drawGpsSpeedScreen();
 static void drawGpsClockScreen();
 static void drawGpsSatInfoScreen();
+static void drawDiceRollScreen();
 
-static const char*    mainItems[] = { "WiFi", "BLE", "GPS", "Settings", "Exit" };
+static const char*    mainItems[] = { "WiFi", "BLE", "GPS", "Games", "Settings", "Exit" };
 static const MenuItem mainOpts[]  = {
     { "WiFi",     act_wifi     },
     { "BLE",      act_ble      },
     { "GPS",      act_gps      },
+    { "Games",    act_games    },
     { "Settings", act_settings },
     { "Exit",     act_exit     }
 };
 
 static const char*    settItems[] = {
-    "Volume", "Sleep Timer", "Timezone", "DST On/Off", "Reboot", "Back"
+    "Volume", "Sleep Timer", "Timezone", "DST On/Off", "Tilt Sensor", "Reboot", "Back"
 };
 static const MenuItem settOpts[] = {
     { "Volume",      act_volume      },
     { "Sleep Timer", act_sleep_timer },
     { "Timezone",    act_timezone    },
     { "DST On/Off",  act_dst_toggle  },
+    { "Tilt Sensor", act_tilt_toggle },
     { "Reboot",      act_reboot      },
     { "Back",        act_back        }
 };
@@ -149,12 +179,7 @@ static const MenuItem bleOpts[]  = {
 };
 
 static const char*    gpsItems[] = {
-    "Status",
-    "Speedometer",
-    "Clock",
-    "Satellites",
-    "Start/Stop",
-    "Back"
+    "Status", "Speedometer", "Clock", "Satellites", "Start/Stop", "Back"
 };
 static const MenuItem gpsOpts[] = {
     { "Status",      act_gps_status   },
@@ -166,6 +191,11 @@ static const MenuItem gpsOpts[] = {
 };
 static const int GPS_MENU_SIZE = 6;
 
+static const char*    gamesItems[] = { "Dice Roller", "Back" };
+static const MenuItem gamesOpts[]  = {
+    { "Dice Roller", act_dice },
+    { "Back",        act_back }
+};
 
 static void act_back() {
     if (currentMenu == MENU_VOLUME || currentMenu == MENU_SLEEP_TIMER ||
@@ -177,6 +207,9 @@ static void act_back() {
                currentMenu == MENU_GPS_SAT_INFO) {
         currentMenu = MENU_GPS;
         menuCursor  = gpsMenuCursor;
+    } else if (currentMenu == MENU_DICE) {
+        currentMenu = MENU_GAMES;
+        menuCursor  = 0;
     } else {
         if (currentMenu == MENU_WIFI &&
             !wifiConnected() && !wifiIsPortalActive()) wifiDeinit();
@@ -192,6 +225,19 @@ static void act_settings() { currentMenu = MENU_SETTINGS;  menuCursor = 0; menuL
 static void act_volume()   { currentMenu = MENU_VOLUME;    menuCursor = 0; menuLongHandled = true; }
 static void act_wifi()     { wifiBegin(); currentMenu = MENU_WIFI; menuCursor = 0; menuLongHandled = true; }
 static void act_ble()      { currentMenu = MENU_BLE;       menuCursor = 0; menuLongHandled = true; }
+
+static void act_games() {
+    currentMenu     = MENU_GAMES;
+    menuCursor      = 0;
+    menuLongHandled = true;
+}
+
+static void act_dice() {
+    diceResult    = 0;
+    diceRolling   = false;
+    currentMenu   = MENU_DICE;
+    menuLongHandled = true;
+}
 
 static void act_gps() {
     if (!gpsActive) gpsBegin();
@@ -361,6 +407,45 @@ static void act_dst_toggle() {
     audio.beep(1000, 30);
 }
 
+static void act_tilt_toggle() {
+    tiltSetEnabled(!tiltEnabled());
+    tiltSaveSettings();
+    if (tiltEnabled()) {
+        showConfirm("Tilt: ON", "Shake to dribble", MENU_SETTINGS);
+    } else {
+        showConfirm("Tilt: OFF", "", MENU_SETTINGS);
+    }
+    audio.beep(1000, 30);
+}
+
+static void drawDiceRollScreen() {
+    const DieType& die = diceTypes[diceCursor];
+
+    if (diceRolling) {
+        diceRollFrame++;
+        if (millis() - diceRollStart > DICE_ROLL_DURATION) {
+            diceRolling = false;
+            diceResult  = random(1, die.sides + 1);
+
+            if (die.sides == 20 && diceResult == 20) {
+                audio.beep(1200, 50);
+                delay(60);
+                audio.beep(1500, 50);
+                delay(60);
+                audio.beep(1800, 80);
+            } else if (die.sides == 20 && diceResult == 1) {
+                audio.beep(400, 100);
+                delay(60);
+                audio.beep(200, 150);
+            } else {
+                audio.beep(800 + (diceResult * 10), 40);
+            }
+        }
+    }
+
+    display.drawDiceRoll(die.label, diceResult, diceRolling, diceRollFrame, tiltEnabled());
+}
+
 static void drawGpsStatusScreen() {
     char l1[32], l2[32], l3[32], l4[32];
 
@@ -525,7 +610,6 @@ static void drawGpsSatInfoScreen() {
     }
 }
 
-
 static void drawWifiInfoScreen() {
     static char l1[32], l2[32], l3[32], l4[32];
     char title[16];
@@ -648,7 +732,6 @@ static void drawWardrivingScreen() {
     display.drawMenu("WARDRIVING", itm, 5, -1);
 }
 
-
 static void drawBleScanScreen() {
     if (bleScanActive) {
         uint32_t elapsed = (millis() - bleScanStartTime()) / 1000;
@@ -694,7 +777,6 @@ static void drawBleScanScreen() {
     }
 }
 
-
 static void drawSleepTimerScreen() {
     static const char* itm[] = {
         "1m", "5m", "15m", "30m", "Never", "Back"
@@ -734,11 +816,9 @@ static void drawTimezoneScreen() {
     display.drawMenu(title, itm, 4, -1);
 }
 
-
 static void drawConfirmScreen() {
     display.drawConfirm(confirmLine1, confirmLine2);
 }
-
 
 void menuBegin() { currentMenu = MENU_OFF; }
 void exitMenu()  { currentMenu = MENU_OFF; }
@@ -758,7 +838,6 @@ void showConfirm(const char* l1, const char* l2, MenuMode ret) {
     currentMenu     = MENU_CONFIRM;
     menuLongHandled = true;
 }
-
 
 void menuUpdate() {
     if (!isMenuActive()) return;
@@ -967,17 +1046,64 @@ void menuUpdate() {
         return;
     }
 
+    if (currentMenu == MENU_DICE) {
+        static int      diceTaps    = 0;
+        static uint32_t diceLastTap = 0;
+
+        if (!diceRolling) {
+            if (touchJustReleased && !touchWasLongPress) {
+                diceTaps++;
+                diceLastTap = millis();
+                audio.beep(400, 15);
+            }
+
+            if (diceTaps > 0 && !isTouched && millis() - diceLastTap > 350) {
+                if (diceTaps >= 2) {
+                    diceRolling   = true;
+                    diceRollStart = millis();
+                    diceRollFrame = 0;
+                    audio.beep(1000, 30);
+                } else {
+                    diceCursor = (diceCursor + 1) % diceTypeCount;
+                    diceResult = 0;
+                    audio.beep(600, 20);
+                }
+                diceTaps = 0;
+            }
+
+            if (tiltEnabled() && tiltSingleHit() && !diceRolling) {
+                diceRolling   = true;
+                diceRollStart = millis();
+                diceRollFrame = 0;
+                diceTaps      = 0;
+                audio.beep(1000, 30);
+            }
+
+            if (longTouchActive && !menuLongHandled) {
+                menuLongHandled = true;
+                diceTaps        = 0;
+                currentMenu     = MENU_GAMES;
+                menuCursor      = 0;
+                audio.beep(900, 50);
+            }
+        }
+
+        drawDiceRollScreen();
+        return;
+    }
+
     const char**    items = nullptr;
     const MenuItem* opts  = nullptr;
     int             size  = 0;
 
     switch (currentMenu) {
-    case MENU_MAIN:     items = mainItems; opts = mainOpts; size = 5; break;
-    case MENU_SETTINGS: items = settItems; opts = settOpts; size = 6; break;
+    case MENU_MAIN:     items = mainItems; opts = mainOpts; size = 6; break;
+    case MENU_SETTINGS: items = settItems; opts = settOpts; size = 7; break;
     case MENU_WIFI:     items = wifiItems; opts = wifiOpts; size = 8; break;
     case MENU_BLE:      items = bleItems;  opts = bleOpts;  size = 3; break;
     case MENU_VOLUME:   items = volItems;  opts = volOpts;  size = 4; break;
     case MENU_GPS:      items = gpsItems;  opts = gpsOpts;  size = GPS_MENU_SIZE; break;
+    case MENU_GAMES:    items = gamesItems; opts = gamesOpts; size = 2; break;
     default: return;
     }
 
@@ -996,7 +1122,8 @@ void menuUpdate() {
     }
 
     display.drawMenu(
-        currentMenu == MENU_MAIN ? "MENU" :
-        currentMenu == MENU_GPS  ? "GPS"  : "SUBMENU",
+        currentMenu == MENU_MAIN  ? "MENU"  :
+        currentMenu == MENU_GPS   ? "GPS"   :
+        currentMenu == MENU_GAMES ? "GAMES" : "SUBMENU",
         items, size, menuCursor);
 }

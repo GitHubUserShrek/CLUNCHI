@@ -27,6 +27,8 @@
 #define GPS_RX_PIN 3
 #define GPS_TX_PIN 4
 #define GPS_BAUD   9600
+//Tilt
+#define TILT_PIN 10
 
 
 #define WIFI_ENABLED       true

@@ -15,6 +15,7 @@
 #include "gps_manager.h"
 #include "sd_manager.h"
 #include "wardriving.h"
+#include "tilt.h"
 
 Display   display;
 Audio     audio;
@@ -90,6 +91,8 @@ void setup() {
     delay(800);
 
     calibrateTouch();
+    tiltBegin(); 
+    tiltLoadSettings();
     menuBegin();
     animation.begin();
 
@@ -139,12 +142,26 @@ void loop() {
 
     handleTouch();
 
+    tiltUpdate();
+    if (tiltEnabled() && !isMenuActive() && !wardrivingActive && !isRadarActive() && mood != SLEEPY) {
+        if (isDribbleActive()) {
+            if (tiltSingleHit()) {
+                triggerDribbleFromShake();
+            }
+        } else {
+            if (tiltShakeDetected()) {
+                triggerDribbleFromShake();
+            }
+        }
+    }
+
     if (isMenuActive()) {
         menuUpdate();
+        lastInteraction = now;
         return;
     }
 
-    if (!isRadarActive()) {
+    if (!isRadarActive() && !isWardrivingActive()) {
         evaluateTaps();
     }
 

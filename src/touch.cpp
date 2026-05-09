@@ -1,6 +1,8 @@
 #include "touch.h"
 #include "config.h"
-#include "animation.h"       
+#include "animation.h"     
+#include "menu.h"  
+#include "tilt.h"
 
 extern Animation animation;  
 
@@ -75,6 +77,22 @@ void handleTouch() {
     }
 
     isTouched = touched;
+}
+
+void triggerDribbleFromShake() {
+    if (isMenuActive()) return;
+
+    if (dribbleActive_) {
+        lastDribbleTap_ = millis();
+        pendingEvent_   = TouchEvent::DRIBBLE_HIT;
+        Serial.println("[Tilt] SHAKE -> BOING!");
+    } else {
+        dribbleActive_  = true;
+        lastDribbleTap_ = millis();
+        tapCount_       = 0;
+        pendingEvent_   = TouchEvent::TAP_10_PLUS;
+        Serial.println("[Tilt] SHAKE -> DRIBBLE MODE!");
+    }
 }
 
 void evaluateTaps() {

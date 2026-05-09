@@ -19,6 +19,8 @@ enum MenuMode {
     MENU_VOLUME,
     MENU_SLEEP_TIMER,
     MENU_TIMEZONE,
+    MENU_GAMES,
+    MENU_DICE,
     MENU_CONFIRM
 };
 

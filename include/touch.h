@@ -29,7 +29,9 @@ void       handleTouch();
 void       evaluateTaps();       
 TouchEvent consumeTouchEvent();  
 void       resetTapCount();
-bool       isDribbleActive();    
+bool       isDribbleActive();   
+
+void triggerDribbleFromShake();
 
 int  readTouchRaw();
 int  getTouchBaseline();

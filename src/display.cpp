@@ -2,6 +2,7 @@
 #include "wardriving.h"
 #include "gps_manager.h"
 #include "ble_manager.h"
+#include "dice_roller.h"
 #include <Wire.h>
 
 bool Display::begin() {
@@ -582,6 +583,15 @@ void Display::drawClock(const char* time, const char* date, const char* timezone
 
     u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
 
+    render();
+}
+
+void Display::drawDiceRoll(const char* dieLabel, int result,
+                            bool rolling, int frame, bool tiltMode) {
+    if (!ready_) return;
+    clear();
+    static DiceRoller roller(u8g2_);
+    roller.draw(dieLabel, result, rolling, frame, tiltMode);
     render();
 }
 
