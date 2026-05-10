@@ -9,8 +9,8 @@ static bool     shakeFlag       = false;
 static bool     singleHitFlag   = false;
 static bool     _tiltEnabled    = true;
 
-#define SHAKE_WINDOW_MS    500
-#define SHAKE_THRESHOLD    4
+#define SHAKE_WINDOW_MS    1000
+#define SHAKE_THRESHOLD    10
 
 void tiltBegin() {
     pinMode(TILT_PIN, INPUT_PULLUP);

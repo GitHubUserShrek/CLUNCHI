@@ -14,32 +14,28 @@ bool          touchWasLongPress = false;
 unsigned long touchDownTime     = 0;
 unsigned long touchUpTime       = 0;
 
-static int           touchBaseline_  = 0;
+static int           touchBaseline_  = 0; 
 static int           tapCount_       = 0;
 static uint32_t      firstTapTime_   = 0;
 static bool          dribbleActive_  = false;
 static uint32_t      lastDribbleTap_ = 0;
 static TouchEvent    pendingEvent_   = TouchEvent::NONE;
 
-int  readTouchRaw()     { return analogRead(PIN_TOUCH); }
+int  readTouchRaw()     { return digitalRead(PIN_TOUCH); }
 int  getTouchBaseline() { return touchBaseline_; }
 bool isDribbleActive()  { return dribbleActive_ || animation.isDribbling(); }
 
 bool readTouch() {
-    int val = readTouchRaw();
-    if (val == 0) return false;
-    return (val - touchBaseline_) > TOUCH_THRESHOLD;
+    return (digitalRead(PIN_TOUCH) == LOW);
 }
 
 void calibrateTouch() {
-    long sum = 0;
-    Serial.print("[Touch] Calibrating");
-    for (int i = 0; i < 50; i++) {
-        sum += readTouchRaw();
-        Serial.print(".");
-        delay(12);
-    }
-    touchBaseline_ = sum / 50;
+    pinMode(PIN_TOUCH, INPUT_PULLUP);
+    
+    delay(50); 
+    
+    touchBaseline_ = 1; 
+    Serial.println("[Touch] Digital Input Ready (Button or TTP223)");
 }
 
 void resetTapCount() {
@@ -82,17 +78,18 @@ void handleTouch() {
 void triggerDribbleFromShake() {
     if (isMenuActive()) return;
 
-    if (dribbleActive_) {
+    if (dribbleActive_ || animation.isDribbling()) {
         lastDribbleTap_ = millis();
         pendingEvent_   = TouchEvent::DRIBBLE_HIT;
         Serial.println("[Tilt] SHAKE -> BOING!");
-    } else {
-        dribbleActive_  = true;
-        lastDribbleTap_ = millis();
-        tapCount_       = 0;
-        pendingEvent_   = TouchEvent::TAP_10_PLUS;
-        Serial.println("[Tilt] SHAKE -> DRIBBLE MODE!");
+        return;
     }
+
+    dribbleActive_  = true;
+    lastDribbleTap_ = millis();
+    tapCount_       = 0;
+    pendingEvent_   = TouchEvent::TAP_10_PLUS;
+    Serial.println("[Tilt] SHAKE -> DRIBBLE MODE!");
 }
 
 void evaluateTaps() {
@@ -105,7 +102,7 @@ void evaluateTaps() {
             Serial.println("[Touch] BOING!");
         }
 
-        if (now - lastDribbleTap_ > 5000) {
+        if (now - lastDribbleTap_ > 3000) {
             dribbleActive_ = false;
             tapCount_ = 0;
             pendingEvent_ = TouchEvent::DRIBBLE_END;
