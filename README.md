@@ -1,5 +1,7 @@
 # CLUNCHI BETA v1.0
 
+!!!!IMPORTANT NOTE: VERSIONS MOVING FORWARD WILL REQUIRE SOLDERING THE JUMPER "A" ON THE TTP223 MODULE BEFORE ASSEMBLY!!!!
+
 CLUNCHI is an ESP32-based network companion.
 
 Built on an ESP32-C3 supermini with a 1.3" SH1106 OLED, capacitive touch, a tiny speaker (8ohm .25 Watt) and an SD reader as well as an ATGM336H GPS module.
