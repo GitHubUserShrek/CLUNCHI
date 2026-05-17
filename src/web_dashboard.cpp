@@ -1,6 +1,6 @@
 #include "web_dashboard.h"
 #include "wifi_manager.h"
-#include "deauth_detector.h"
+#include "wids.h"          
 #include "net_health.h"
 #include <WebServer.h>
 #include <esp_wifi.h>
@@ -32,7 +32,6 @@ struct NearbyAP {
 static NearbyAP  _nearbyAPs[MAX_NEARBY];
 static int       _nearbyCount    = 0;
 static uint32_t  _lastNearbyScan = 0;
-
 
 static void measureDnsLatency() {
     if (!wifiConnected()) { _lastDnsLatency = 0; return; }
@@ -81,7 +80,7 @@ static void trackConnection() {
 }
 
 static void pauseBackground() {
-    if (deauthDetectorActive) deauthDetectorEnd();
+    if (widsActive) widsEnd();
     netHealthEnd();
     esp_wifi_set_promiscuous(false);
     delay(50);
@@ -89,7 +88,7 @@ static void pauseBackground() {
 
 static void resumeBackground() {
     if (wifiConnected()) {
-        deauthDetectorBegin();
+        widsBegin();
         netHealthBegin();
     }
 }
@@ -147,7 +146,6 @@ static String buildSignalBars(int32_t rssi) {
     return html;
 }
 
-
 static void sendHtmlHeader() {
     _server->sendContent(F("<!DOCTYPE html><html><head>"));
     _server->sendContent(F("<title>CLUNCHI ANALYZER</title>"));
@@ -167,25 +165,20 @@ static void sendHtmlHeader() {
     _server->sendContent(F("th{text-align:left;color:#080;border-bottom:1px solid #0f0;padding-bottom:3px;letter-spacing:1px;}"));
     _server->sendContent(F("td{padding:3px 0;color:#0f0;}"));
     _server->sendContent(F(".warn{color:#f00;} .ok{color:#0f0;} .med{color:#ff0;}"));
-
     _server->sendContent(F(".bar{width:4px;border-radius:1px;}"));
-
     _server->sendContent(F(".sig-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px dotted #0a0;font-size:12px;}"));
     _server->sendContent(F(".sig-right{display:flex;align-items:center;}"));
     _server->sendContent(F(".sig-right span{display:inline-block;line-height:12px;}"));
     _server->sendContent(F(".bars{display:inline-flex;align-items:flex-end;gap:2px;margin-left:6px;transform:translateY(-1px);}"));
-
     _server->sendContent(F(".footer{font-size:9px;color:#0a0;margin-top:30px;letter-spacing:1px;}"));
     _server->sendContent(F(".empty{font-size:10px;color:#0a0;padding:5px;}"));
     _server->sendContent(F(".mac{font-size:8px;color:#0a0;letter-spacing:0.5px;}"));
     _server->sendContent(F(".alert-box{font-size:10px;color:#f00;padding:5px;margin-top:5px;border:1px solid #f00;}"));
-
     _server->sendContent(F("</style></head><body>"));
     _server->sendContent(F("<div class='box'>"));
     _server->sendContent(F("<h2>CLUNCHI</h2>"));
-    _server->sendContent(F("<div class='subtitle'>NETWORK ANALYZER BETA v1.0</div>"));
+    _server->sendContent(F("<div class='subtitle'>TACTICAL WIDS DASHBOARD v2.0</div>"));
 }
-
 
 static void handleRoot() {
     pauseBackground();
@@ -200,9 +193,7 @@ static void handleRoot() {
 
     auto sendRow = [](const char* label, String value, bool isWarn = false) {
         String css = isWarn ? "v warn" : "v";
-        _server->sendContent(
-            "<div class='r'><span>" + String(label) +
-            "</span><span class='" + css + "'>" + value + "</span></div>");
+        _server->sendContent("<div class='r'><span>" + String(label) + "</span><span class='" + css + "'>" + value + "</span></div>");
     };
 
     int32_t rssi = wifiRSSI();
@@ -224,47 +215,52 @@ static void handleRoot() {
     _server->sendContent(F("</div>"));
 
     _server->sendContent(F("<div class='sec'>"));
-    _server->sendContent(F("<span class='sec-h'>// L2 SECURITY</span>"));
+    _server->sendContent(F("<span class='sec-h'>// WIRELESS IDS (WIDS)</span>"));
 
-    uint8_t threat   = deauthThreatScore();
-    bool    underAtk = deauthUnderAttack();
+    uint8_t threat   = widsThreatScore();
+    bool    underAtk = widsUnderAttack();
     String  threatLbl = (threat >= 70) ? "HIGH" : (threat >= 30) ? "MEDIUM" : "LOW";
 
-    sendRow("Total Alerts",   String(deauthTotalCount),         deauthTotalCount > 0);
-    sendRow("Recent (10s)",   String(deauthRecentCount(10000)), deauthRecentCount(10000) > 0);
-    sendRow("Unique Sources", String(deauthUniqueSourceCount()));
-    sendRow("Threat Score",   String(threat) + "/100 [" + threatLbl + "]", threat >= 30);
-    sendRow("Under Attack",   underAtk ? "YES" : "NO", underAtk);
+    sendRow("Total Incidents", String(widsTotalCount),         widsTotalCount > 0);
+    sendRow("Recent (10s)",    String(widsRecentCount(10000)), widsRecentCount(10000) > 0);
+    sendRow("Unique Attackers",String(widsUniqueSourceCount()));
+    sendRow("Threat Score",    String(threat) + "/100 [" + threatLbl + "]", threat >= 30);
+    sendRow("Under Attack",    underAtk ? "YES" : "NO", underAtk);
 
-    int topIdx = deauthMostActiveSourceIndex();
-    if (topIdx >= 0) {
-        sendRow("Top Source", deauthMacToString(deauthLog[topIdx].source), true);
+    int topIdx = widsMostActiveSourceIndex();
+    if (topIdx >= 0 && widsLogCount > 0) {
+        sendRow("Top Attacker", widsMacToString(widsLog[topIdx].source), true);
     }
 
     if (underAtk) {
-        _server->sendContent(F("<div class='alert-box'>&#9888; ACTIVE DEAUTH ATTACK DETECTED</div>"));
+        _server->sendContent(F("<div class='alert-box'>&#9888; ACTIVE WIRELESS ATTACK DETECTED</div>"));
     }
 
-    if (deauthLogCount > 0) {
-        _server->sendContent(F("<table><tr><th>TYPE</th><th>SOURCE</th><th>TARGET</th><th>RSSI</th><th>REASON</th></tr>"));
-        for (int i = deauthLogCount - 1; i >= max(0, deauthLogCount - 5); i--) {
-            DeauthEvent& e = deauthLog[i];
-            String rowCss  = e.isTargeted ? "warn" : "ok";
+    if (widsLogCount > 0) {
+        _server->sendContent(F("<table><tr><th>TYPE</th><th>SOURCE</th><th>TARGET</th><th>RSSI</th><th>PARAM</th></tr>"));
+        int count = min(widsLogCount, 5);
+        for (int i = 0; i < count; i++) {
+            int idx = (widsLogHead - 1 - i + WIDS_LOG_SIZE) % WIDS_LOG_SIZE;
+            ThreatEvent& e = widsLog[idx];
+            
+            String rowCss  = (e.isTargeted || e.type == ATTACK_EVIL_TWIN) ? "warn" : "ok";
+            String typeShort = String(widsAttackTypeString(e.type)).substring(0, 4); 
+            
             _server->sendContent("<tr class='" + rowCss + "'><td>");
-            _server->sendContent(e.isDisassoc ? "DISS" : "DEAU");
+            _server->sendContent(typeShort);
             _server->sendContent("</td><td>");
-            _server->sendContent(deauthMacToString(e.source).substring(9));
+            _server->sendContent(widsMacToString(e.source).substring(9)); 
             _server->sendContent("</td><td>");
-            _server->sendContent(e.isTargeted ? "YOU" : "AIR");
+            _server->sendContent(e.isBroadcast ? "ALL" : (e.isTargeted ? "YOU" : "AIR"));
             _server->sendContent("</td><td>");
             _server->sendContent(String(e.rssi));
             _server->sendContent("</td><td>");
-            _server->sendContent(String(deauthReasonString(e.reasonCode)));
+            _server->sendContent(String(widsReasonString(e.param)));
             _server->sendContent("</td></tr>");
         }
         _server->sendContent(F("</table>"));
     } else {
-        _server->sendContent(F("<div class='empty'>NO DEAUTH FRAMES DETECTED.</div>"));
+        _server->sendContent(F("<div class='empty'>AIRSPACE IS CLEAN. NO ATTACKS DETECTED.</div>"));
     }
     _server->sendContent(F("</div>"));
 
@@ -286,12 +282,10 @@ static void handleRoot() {
     }
 
     sendRow("Packet Loss", String(nhStats.lossPercent) + "%", nhStats.lossPercent > 10);
-
     sendRow("DNS Lookup",
             (_lastDnsLatency == 9999 ? "FAILED" :
             (_lastDnsLatency > 0     ? String(_lastDnsLatency) + " ms" : "---")),
             _lastDnsLatency > 500 || _lastDnsLatency == 9999);
-
     sendRow("Fail Count", String(netHealthConsecutiveFails), netHealthConsecutiveFails > 0);
     _server->sendContent(F("</div>"));
 
@@ -366,15 +360,13 @@ static void handleRoot() {
     sendRow("Uptime",      wifiUptimeFormatted());
     _server->sendContent(F("</div>"));
 
-    _server->sendContent(F("<div class='footer'>CLUNCHI ANALYZER BETA v1.0</div>"));
-
+    _server->sendContent(F("<div class='footer'>CLUNCHI TACTICAL DASHBOARD v2.0</div>"));
     _server->sendContent(F("</div></body></html>"));
     _server->sendContent("");
 
     delay(200);
     resumeBackground();
 }
-
 
 static void handleAPI() {
     String json = "{";
@@ -392,9 +384,10 @@ static void handleAPI() {
     json += "\"jitter\":"        + String(nhStats.jitterMs)                + ",";
     json += "\"loss_pct\":"      + String(nhStats.lossPercent)             + ",";
     json += "\"dns_latency\":"   + String(_lastDnsLatency)                 + ",";
-    json += "\"deauth_count\":"  + String(deauthTotalCount)                + ",";
-    json += "\"threat_score\":"  + String(deauthThreatScore())             + ",";
-    json += "\"under_attack\":"  + String(deauthUnderAttack() ? "true" : "false") + ",";
+    json += "\"wids_count\":"    + String(widsTotalCount)                  + ","; 
+    json += "\"deauth_count\":"  + String(widsTotalCount)                  + ","; 
+    json += "\"threat_score\":"  + String(widsThreatScore())               + ",";
+    json += "\"under_attack\":"  + String(widsUnderAttack() ? "true" : "false") + ",";
     json += "\"uptime\":"        + String(wifiConnUptime())                + ",";
     json += "\"heap\":"          + String(ESP.getFreeHeap())               + ",";
     json += "\"security\":\""    + getSecurityType()                       + "\"";
@@ -403,7 +396,6 @@ static void handleAPI() {
     _server->sendHeader("Access-Control-Allow-Origin", "*");
     _server->send(200, "application/json", json);
 }
-
 
 void dashboardBegin() {
     if (_active) return;

@@ -13,6 +13,7 @@ enum Mood {
     ENRAGED,
     DEAD,
     DRIVING,
+    TACTICAL,
     MOOD_COUNT
 };
 

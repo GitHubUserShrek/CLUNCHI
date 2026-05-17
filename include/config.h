@@ -17,8 +17,6 @@
 
 //Touch/Button
 #define PIN_TOUCH          1  
-
-// Timing logic (No thresholds needed for Digital)
 #define LONG_TOUCH_TIME    1200      
 #define TAP_SEQUENCE_TIME  3000     
 
@@ -29,8 +27,8 @@
 #define SD_SCK  8
 
 //GPS
-#define GPS_RX_PIN 3
-#define GPS_TX_PIN 4
+#define GPS_RX_PIN 3 //RX->TX(GPS)
+#define GPS_TX_PIN 4 //TX->RX(GPS)
 #define GPS_BAUD   9600
 
 //Tilt
@@ -43,4 +41,4 @@
 #define WIFI_AP_NAME       "CLUNCHI_Setup"
 #define WIFI_AP_PASS       "clunchi123"
 
-#define BLE_SCAN_DURATION  15000     
+#define BLE_SCAN_DURATION  10000     

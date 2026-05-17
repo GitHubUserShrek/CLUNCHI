@@ -9,7 +9,7 @@
 #include "mood.h"
 #include "wifi_manager.h"
 #include "ble_manager.h"
-#include "deauth_detector.h"
+#include "wids.h"
 #include "net_health.h"
 #include "web_dashboard.h"
 #include "gps_manager.h"
@@ -27,13 +27,13 @@ static const uint32_t frameTime = 1000 / FPS_TARGET;
 static void handleWifiLifecycle() {
     if (wifiJustConnected()) {
         Serial.println("[System] WiFi up — starting background systems.");
-        deauthDetectorBegin();
+        widsBegin();
         netHealthBegin();
         dashboardBegin();
     }
     if (wifiJustDisconnected()) {
         Serial.println("[System] WiFi lost — stopping background systems.");
-        deauthDetectorEnd();
+        widsEnd();
         netHealthEnd();
         dashboardEnd();
     }
@@ -49,24 +49,26 @@ static void handlePeriodicLog(uint32_t now) {
         uint32_t hrs  = up / 3600;
         uint32_t mins = (up % 3600) / 60;
         uint32_t secs = up % 60;
+        
         Serial.printf(
-            "[CLUNCHI] WiFi:OK | IP:%s | RSSI:%lddBm | "
-            "Up:%luh%lum%lus | Grade:%s\n",
+            "[CLUNCHI Status] WiFi:OK | IP:%s | RSSI:%lddBm | Up:%luh%lum%lus | Grade:%s | WIDS Threat:%d/100 (Incidents:%lu)\n",
             wifiIP().c_str(),
             (long)wifiRSSI(),
             (unsigned long)hrs,
             (unsigned long)mins,
             (unsigned long)secs,
-            netGradeLabel(nhStats.grade));
+            netGradeLabel(nhStats.grade),
+            widsThreatScore(),
+            (unsigned long)widsTotalCount);
     } else {
-        Serial.println("[CLUNCHI] Take me to your WiFi");
+        Serial.println("[CLUNCHI Status] Disconnected. Take me to your WiFi.");
     }
 }
 
 void setup() {
     Serial.begin(115200);
     delay(900);
-    Serial.println("\n[System] CLUNCHI BETA V1.0 Booting...");
+    Serial.println("\n[System] CLUNCHI TACTICAL PET v2.0 Booting...");
 
     Preferences nvsInit;
     nvsInit.begin("clunchi", false); nvsInit.end();
@@ -110,8 +112,10 @@ void loop() {
     gpsUpdate();
 
     if (isRadarActive())      bleUpdate();
-    if (deauthDetectorActive) deauthDetectorUpdate();
-    if (nhActive)             netHealthUpdate();
+    if (widsActive)           widsUpdate();
+    
+    if (nhActive && !widsHasRecentAlert(5000)) netHealthUpdate(); 
+    
     if (isDashboardActive())  dashboardUpdate();
     if (sdActive)             sdUpdate();
     if (wardrivingActive) {
@@ -121,13 +125,11 @@ void loop() {
 
     if (wifiIsPortalActive()) {
         handleTouch();
-
         static uint32_t lastPortalDraw = 0;
         if (now - lastPortalDraw > 500) {
             lastPortalDraw = now;
             menuUpdate();
         }
-
         delay(1);
         return;
     }
@@ -141,17 +143,13 @@ void loop() {
     lastFrame = now;
 
     handleTouch();
-
     tiltUpdate();
+    
     if (tiltEnabled() && !isMenuActive() && !wardrivingActive && !isRadarActive() && mood != SLEEPY) {
         if (isDribbleActive()) {
-            if (tiltSingleHit()) {
-                triggerDribbleFromShake();
-            }
+            if (tiltSingleHit()) triggerDribbleFromShake();
         } else {
-            if (tiltShakeDetected()) {
-                triggerDribbleFromShake();
-            }
+            if (tiltShakeDetected()) triggerDribbleFromShake();
         }
     }
 
