@@ -5,6 +5,7 @@
 #include "dice_roller.h"
 #include "logo_bitmaps.h"
 #include "mesh_wardrive.h"
+#include "magic_8ball.h"
 #include <Wire.h>
 
 bool Display::begin() {
@@ -452,8 +453,18 @@ void Display::drawClock(const char* time, const char* date, const char* timezone
     u8g2_.setFont(u8g2_font_5x7_tr); u8g2_.drawStr(4, 62, timezone); u8g2_.drawStr(82, 62, "Hold:Back"); u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6); render();
 }
 
-void Display::drawDiceRoll(const char* dieLabel, int result, bool rolling, int frame, bool tiltMode) {
-    if (!ready_) return; clear(); static DiceRoller roller(u8g2_); roller.draw(dieLabel, result, rolling, frame, tiltMode); render();
+void Display::drawDiceScreen(bool tiltMode) {
+    if (!ready_) return;
+    clear(); 
+    diceRoller_.updateAndDraw(tiltMode); 
+    render();
+}
+
+void Display::drawMagic8BallScreen(bool tiltMode) {
+    if (!ready_) return;
+    clear(); 
+    magic8Ball_.updateAndDraw(tiltMode); 
+    render();
 }
 
 void Display::drawAngryAura() {

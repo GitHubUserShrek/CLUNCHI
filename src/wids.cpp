@@ -227,8 +227,10 @@ void widsBegin() {
     uint8_t* bssid = WiFi.BSSID();
     if (bssid) { memcpy(_ourBSSID, bssid, 6); _hasOurBSSID = true; } else { _hasOurBSSID = false; }
 
-    widsTotalCount = 0; widsLogCount = 0; widsLogHead = 0; widsLastTime = 0; _newAlert = false;
-    _trackedBssidCount = 0; _lastDeauthTime = 0;
+    // ---> FIX: Removed log wiping! Only reset transient sniffer state. <---
+    _newAlert          = false;
+    _trackedBssidCount = 0; 
+    _lastDeauthTime    = 0;
 
     initSdLogFile();
 

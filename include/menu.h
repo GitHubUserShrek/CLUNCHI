@@ -21,6 +21,7 @@ enum MenuMode {
     MENU_TIMEZONE,
     MENU_GAMES,
     MENU_DICE,
+    MENU_MAGIC_8BALL,
     MENU_CONFIRM
 };
 
