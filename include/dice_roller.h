@@ -2,20 +2,23 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 
-struct Particle {
+struct Particle
+{
     int16_t x, y;
-    int8_t  vx, vy;
+    int8_t vx, vy;
     uint8_t life;
 };
 
-struct DieType {
-    const char* label;
-    int         sides;
+struct DieType
+{
+    const char *label;
+    int sides;
 };
 
-class DiceRoller {
+class DiceRoller
+{
 public:
-    DiceRoller(U8G2& u8g2) : u8g2_(u8g2) {}
+    DiceRoller(U8G2 &u8g2) : u8g2_(u8g2) {}
 
     void nextDie();
     void startRoll();
@@ -24,18 +27,18 @@ public:
     void reset();
 
 private:
-    U8G2& u8g2_;
+    U8G2 &u8g2_;
 
     static const DieType diceTypes_[7];
-    int      diceCursor_       = 5; // Default to D20
-    int      diceResult_       = 0;
-    bool     rolling_          = false;
-    uint32_t rollStartTime_    = 0;
-    int      rollFrame_        = 0;
-    float    spinSpeed_        = 0;
-    int      shakeX_           = 0;
-    int      shakeY_           = 0;
-    bool     hasCriticalBurst_ = false;
+    int diceCursor_ = 5; // Default to D20
+    int diceResult_ = 0;
+    bool rolling_ = false;
+    uint32_t rollStartTime_ = 0;
+    int rollFrame_ = 0;
+    float spinSpeed_ = 0;
+    int shakeX_ = 0;
+    int shakeY_ = 0;
+    bool hasCriticalBurst_ = false;
 
     static constexpr int MAX_PARTICLES = 12;
     Particle particles_[MAX_PARTICLES] = {};

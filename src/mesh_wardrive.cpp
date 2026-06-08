@@ -4,106 +4,175 @@
 #include <SD.h>
 
 #define MAX_SEEN_MESH 100
-static String   _seenMeshNodes[MAX_SEEN_MESH];
-static int      _seenMeshCount   = 0;
-static bool     _hasNewMeshNode  = false;
+static String _seenMeshNodes[MAX_SEEN_MESH];
+static int _seenMeshCount = 0;
+static bool _hasNewMeshNode = false;
 static uint32_t _lastNewNodeTime = 0;
 
-void meshBegin() {
-    _seenMeshCount   = 0;
-    _hasNewMeshNode  = false;
+void meshBegin()
+{
+    _seenMeshCount = 0;
+    _hasNewMeshNode = false;
     _lastNewNodeTime = 0;
-    if (sdActive && !SD.exists("/mesh")) {
+    if (sdActive && !SD.exists("/mesh"))
+    {
         SD.mkdir("/mesh");
     }
-    Serial.println("[Mesh Wardrive] Tactical Scout engine initialized.");
+    Serial.println("[Mesh BLE Wardrive] Tactical Scout engine initialized.");
 }
 
-void meshEnd() {
-    _seenMeshCount  = 0;
+void meshEnd()
+{
+    _seenMeshCount = 0;
     _hasNewMeshNode = false;
-    Serial.printf("[Mesh Wardrive] Scout engine offline. Session nodes tracked: %d\n", _seenMeshCount);
+    Serial.printf("[Mesh BLE Wardrive] Scout engine offline. Session nodes tracked: %d\n", _seenMeshCount);
 }
 
-int meshGetLoggedCount() {
+int meshGetLoggedCount()
+{
     return _seenMeshCount;
 }
 
-static bool isMeshNodeAlreadySeen(const String& addr) {
-    for (int i = 0; i < _seenMeshCount; i++) {
-        if (_seenMeshNodes[i] == addr) return true;
+static bool isMeshNodeAlreadySeen(const String &addr)
+{
+    for (int i = 0; i < _seenMeshCount; i++)
+    {
+        if (_seenMeshNodes[i] == addr)
+            return true;
     }
-    if (_seenMeshCount < MAX_SEEN_MESH) {
+    if (_seenMeshCount < MAX_SEEN_MESH)
+    {
         _seenMeshNodes[_seenMeshCount++] = addr;
     }
     return false;
 }
 
-bool meshProcessDevice(const NimBLEAdvertisedDevice* device, const String& name, const String& addr, bool& outIsMesh, bool& outIsNew) {
+bool meshProcessDevice(const NimBLEAdvertisedDevice *device, const String &name, const String &addr, bool &outIsMesh, bool &outIsNew)
+{
     outIsMesh = false;
-    outIsNew  = false;
+    outIsNew = false;
 
     int sDataCount = device->getServiceDataCount();
-    for (int i = 0; i < sDataCount; i++) {
-        String sUuid = device->getServiceDataUUID(i).toString().c_str(); sUuid.toLowerCase();
-        if (sUuid.indexOf("1ba9f000") >= 0 || sUuid.indexOf("cb0b9a0b") >= 0 || sUuid.indexOf("ba57") >= 0) {
-            outIsMesh = true; break;
+    for (int i = 0; i < sDataCount; i++)
+    {
+        String sUuid = device->getServiceDataUUID(i).toString().c_str();
+        sUuid.toLowerCase();
+        if (sUuid.indexOf("1ba9f000") >= 0 || sUuid.indexOf("cb0b9a0b") >= 0)
+        {
+            outIsMesh = true;
+            break;
+        }
+    }
+    if (!outIsMesh)
+    {
+        int sUuidCount = device->getServiceUUIDCount();
+        for (int i = 0; i < sUuidCount; i++)
+        {
+            String sUuid = device->getServiceUUID(i).toString().c_str();
+            sUuid.toLowerCase();
+            if (sUuid.indexOf("1ba9f000") >= 0 || sUuid.indexOf("cb0b9a0b") >= 0)
+            {
+                outIsMesh = true;
+                break;
+            }
         }
     }
 
-    if (!outIsMesh && name.length() >= 6 && name.indexOf('_') > 0) {
-        int underscoreIdx = name.lastIndexOf('_'); String suffix = name.substring(underscoreIdx + 1); suffix.toLowerCase();
-        if (addr.length() >= 17 && suffix.length() == 4) {
-            String macSuffix = addr.substring(12, 14) + addr.substring(15, 17); macSuffix.toLowerCase();
-            if (suffix == macSuffix) outIsMesh = true;
+    if (!outIsMesh && name.length() >= 9)
+    {
+        bool isShortName = (name.length() == 9 && name[4] == '_');
+        bool isDefaultName = (name.length() == 15 && name.startsWith("Meshtastic_"));
+
+        if (isShortName || isDefaultName)
+        {
+            String suffix = isShortName ? name.substring(5, 9) : name.substring(11, 15);
+
+            if (addr.length() >= 17)
+            {
+                String macSuffix = addr.substring(12, 14) + addr.substring(15, 17);
+
+                long suffixInt = strtol(suffix.c_str(), NULL, 16);
+                long macSuffixInt = strtol(macSuffix.c_str(), NULL, 16);
+
+                if (abs(suffixInt - macSuffixInt) <= 2)
+                {
+                    outIsMesh = true;
+                }
+            }
         }
     }
 
-    if (outIsMesh) {
-        if (!isMeshNodeAlreadySeen(addr)) {
-            outIsNew         = true;
-            _hasNewMeshNode  = true;
+    if (outIsMesh)
+    {
+        if (!isMeshNodeAlreadySeen(addr))
+        {
+            outIsNew = true;
+            _hasNewMeshNode = true;
             _lastNewNodeTime = millis();
         }
     }
     return outIsMesh;
 }
 
-bool meshHasRecentNewNode() {
-    if (!_hasNewMeshNode) return false;
-    if (millis() - _lastNewNodeTime > 5000) {
-        _hasNewMeshNode = false; 
+bool meshHasRecentNewNode()
+{
+    if (!_hasNewMeshNode)
+        return false;
+    if (millis() - _lastNewNodeTime > 5000)
+    {
+        _hasNewMeshNode = false;
         return false;
     }
     return true;
 }
 
-void meshLogToSD(const BLEResult* results, int count) {
-    if (!sdActive) return;
+void meshLogToSD(const BLEResult *results, int count)
+{
+    if (!sdActive)
+        return;
 
     int newMeshCount = 0;
-    for (int i = 0; i < count; i++) if (results[i].isNewMeshtastic) newMeshCount++;
-    if (newMeshCount == 0) return;
+    for (int i = 0; i < count; i++)
+        if (results[i].isNewMeshtastic)
+            newMeshCount++;
+    if (newMeshCount == 0)
+        return;
 
-    if (!SD.exists("/mesh")) SD.mkdir("/mesh");
+    if (!SD.exists("/mesh"))
+        SD.mkdir("/mesh");
 
-    char dateBuf[16]; LocalTime lt = gpsGetLocalTime();
-    if (lt.valid) snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", lt.year, lt.month, lt.day);
-    else if (gpsData.year > 2000) snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", gpsData.year, gpsData.month, gpsData.day);
-    else strcpy(dateBuf, "NODATE");
+    char dateBuf[16];
+    LocalTime lt = gpsGetLocalTime();
+    if (lt.valid)
+        snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", lt.year, lt.month, lt.day);
+    else if (gpsData.year > 2000)
+        snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", gpsData.year, gpsData.month, gpsData.day);
+    else
+        strcpy(dateBuf, "NODATE");
 
-    char pathBuf[48]; snprintf(pathBuf, sizeof(pathBuf), "/mesh/MESH_%s.csv", dateBuf);
-    bool isNew = !SD.exists(pathBuf); File f = SD.open(pathBuf, FILE_APPEND);
-    if (!f) { Serial.println("[Mesh Wardrive] ERROR: could not open SD log file"); return; }
-    if (isNew) f.println("time,lat,lon,alt,sats,address,node_name,rssi,addr_type");
+    char pathBuf[48];
+    snprintf(pathBuf, sizeof(pathBuf), "/mesh/MESH_%s.csv", dateBuf);
+    bool isNew = !SD.exists(pathBuf);
+    File f = SD.open(pathBuf, FILE_APPEND);
+    if (!f)
+    {
+        Serial.println("[Mesh Wardrive] ERROR: could not open SD log file");
+        return;
+    }
+    if (isNew)
+        f.println("time,lat,lon,alt,sats,address,node_name,rssi,addr_type");
 
     char timeBuf[16];
-    if (lt.valid) snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", lt.hour, lt.minute, lt.second);
-    else snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", gpsData.hour, gpsData.minute, gpsData.second);
+    if (lt.valid)
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", lt.hour, lt.minute, lt.second);
+    else
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", gpsData.hour, gpsData.minute, gpsData.second);
 
-    for (int i = 0; i < count; i++) {
-        if (!results[i].isNewMeshtastic) continue;
-        const BLEResult& r = results[i];
+    for (int i = 0; i < count; i++)
+    {
+        if (!results[i].isNewMeshtastic)
+            continue;
+        const BLEResult &r = results[i];
 
         String name = r.name.isEmpty() ? "Unknown_Node" : r.name;
         name.replace(",", ";");
@@ -115,5 +184,5 @@ void meshLogToSD(const BLEResult* results, int count) {
         f.println(line);
     }
     f.close();
-    Serial.printf("[Mesh Wardrive Log] %d new node(s) saved to %s\n", newMeshCount, pathBuf);
+    Serial.printf("[Mesh BLE Wardrive Log] %d new node(s) saved to %s\n", newMeshCount, pathBuf);
 }

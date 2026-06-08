@@ -17,21 +17,24 @@
 #include "wardriving.h"
 #include "tilt.h"
 
-Display   display;
-Audio     audio;
+Display display;
+Audio audio;
 Animation animation;
 
-static uint32_t       lastFrame = 0;
+static uint32_t lastFrame = 0;
 static const uint32_t frameTime = 1000 / FPS_TARGET;
 
-static void handleWifiLifecycle() {
-    if (wifiJustConnected()) {
+static void handleWifiLifecycle()
+{
+    if (wifiJustConnected())
+    {
         Serial.println("[System] WiFi up — starting background systems.");
         widsBegin();
         netHealthBegin();
         dashboardBegin();
     }
-    if (wifiJustDisconnected()) {
+    if (wifiJustDisconnected())
+    {
         Serial.println("[System] WiFi lost — stopping background systems.");
         widsEnd();
         netHealthEnd();
@@ -39,17 +42,20 @@ static void handleWifiLifecycle() {
     }
 }
 
-static void handlePeriodicLog(uint32_t now) {
+static void handlePeriodicLog(uint32_t now)
+{
     static uint32_t lastPrint = 0;
-    if (now - lastPrint < 90000) return;
+    if (now - lastPrint < 90000)
+        return;
     lastPrint = now;
 
-    if (wifiConnected()) {
-        uint32_t up   = wifiConnUptime();
-        uint32_t hrs  = up / 3600;
+    if (wifiConnected())
+    {
+        uint32_t up = wifiConnUptime();
+        uint32_t hrs = up / 3600;
         uint32_t mins = (up % 3600) / 60;
         uint32_t secs = up % 60;
-        
+
         Serial.printf(
             "[CLUNCHI Status] WiFi:OK | IP:%s | RSSI:%lddBm | Up:%luh%lum%lus | Grade:%s | WIDS Threat:%d/100 (Incidents:%lu)\n",
             wifiIP().c_str(),
@@ -60,32 +66,42 @@ static void handlePeriodicLog(uint32_t now) {
             netGradeLabel(nhStats.grade),
             widsThreatScore(),
             (unsigned long)widsTotalCount);
-    } else {
+    }
+    else
+    {
         Serial.println("[CLUNCHI Status] Disconnected. Take me to your WiFi.");
     }
 }
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(900);
     Serial.println("\n[System] CLUNCHI TACTICAL PET v2.0 Booting...");
 
     Preferences nvsInit;
-    nvsInit.begin("clunchi", false); nvsInit.end();
-    nvsInit.begin("wifi",    false); nvsInit.end();
+    nvsInit.begin("clunchi", false);
+    nvsInit.end();
+    nvsInit.begin("wifi", false);
+    nvsInit.end();
     Serial.println("[System] NVS ready.");
 
     audio.begin();
     audio.beep(1000, 50);
 
-    if (!display.begin()) {
+    if (!display.begin())
+    {
         Serial.println("[System] Display FAILED. Halting.");
-        while (true) { audio.beep(200, 100); delay(500); }
+        while (true)
+        {
+            audio.beep(200, 100);
+            delay(500);
+        }
     }
 
     wifiBegin();
     gpsBegin();
-    gpsLoadTimeSettings(); 
+    gpsLoadTimeSettings();
     sdBegin();
 
     display.drawSplash();
@@ -93,7 +109,7 @@ void setup() {
     delay(800);
 
     calibrateTouch();
-    tiltBegin(); 
+    tiltBegin();
     tiltLoadSettings();
     menuBegin();
     animation.begin();
@@ -103,7 +119,8 @@ void setup() {
     Serial.println("[System] Boot complete.");
 }
 
-void loop() {
+void loop()
+{
     uint32_t now = millis();
 
     wifiUpdate();
@@ -111,22 +128,30 @@ void loop() {
     handleWifiLifecycle();
     gpsUpdate();
 
-    if (isRadarActive())      bleUpdate();
-    if (widsActive)           widsUpdate();
-    
-    if (nhActive && !widsHasRecentAlert(5000)) netHealthUpdate(); 
-    
-    if (isDashboardActive())  dashboardUpdate();
-    if (sdActive)             sdUpdate();
-    if (wardrivingActive) {
+    if (isRadarActive())
+        bleUpdate();
+    if (widsActive)
+        widsUpdate();
+
+    if (nhActive && !widsHasRecentAlert(5000))
+        netHealthUpdate();
+
+    if (isDashboardActive())
+        dashboardUpdate();
+    if (sdActive)
+        sdUpdate();
+    if (wardrivingActive)
+    {
         wardrivingUpdate();
         gpsPrintStatus();
     }
 
-    if (wifiIsPortalActive()) {
+    if (wifiIsPortalActive())
+    {
         handleTouch();
         static uint32_t lastPortalDraw = 0;
-        if (now - lastPortalDraw > 500) {
+        if (now - lastPortalDraw > 500)
+        {
             lastPortalDraw = now;
             menuUpdate();
         }
@@ -134,32 +159,42 @@ void loop() {
         return;
     }
 
-    if (connectState == CONN_TRYING) {
+    if (connectState == CONN_TRYING)
+    {
         delay(1);
         return;
     }
 
-    if (now - lastFrame < frameTime) return;
+    if (now - lastFrame < frameTime)
+        return;
     lastFrame = now;
 
     handleTouch();
     tiltUpdate();
-    
-    if (tiltEnabled() && !isMenuActive() && !wardrivingActive && !isRadarActive() && mood != SLEEPY) {
-        if (isDribbleActive()) {
-            if (tiltSingleHit()) triggerDribbleFromShake();
-        } else {
-            if (tiltShakeDetected()) triggerDribbleFromShake();
+
+    if (tiltEnabled() && !isMenuActive() && !wardrivingActive && !isRadarActive() && mood != SLEEPY)
+    {
+        if (isDribbleActive())
+        {
+            if (tiltSingleHit())
+                triggerDribbleFromShake();
+        }
+        else
+        {
+            if (tiltShakeDetected())
+                triggerDribbleFromShake();
         }
     }
 
-    if (isMenuActive()) {
+    if (isMenuActive())
+    {
         menuUpdate();
         lastInteraction = now;
         return;
     }
 
-    if (!isRadarActive() && !isWardrivingActive()) {
+    if (!isRadarActive() && !isWardrivingActive())
+    {
         evaluateTaps();
     }
 

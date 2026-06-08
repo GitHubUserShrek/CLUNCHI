@@ -2,7 +2,8 @@
 #include <Arduino.h>
 #include "touch.h"
 
-enum Mood {
+enum Mood
+{
     NEUTRAL,
     HAPPY,
     SLEEPY,
@@ -17,12 +18,12 @@ enum Mood {
     MOOD_COUNT
 };
 
-extern Mood     mood;
+extern Mood mood;
 extern uint32_t moodChangeTime;
 extern uint32_t lastInteraction;
 
-void moodBegin();                         
-void moodUpdate(TouchEvent event);         
+void moodBegin();
+void moodUpdate(TouchEvent event);
 
 void triggerRadar();
 void exitRadar();
@@ -32,5 +33,5 @@ void triggerWardriving();
 void exitWardriving();
 bool isWardrivingMoodActive();
 
-const char* moodName(Mood m);
-Mood        baseMood();
+const char *moodName(Mood m);
+Mood baseMood();

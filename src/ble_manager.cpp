@@ -1,5 +1,5 @@
 #include "ble_manager.h"
-#include "mesh_wardrive.h" 
+#include "mesh_wardrive.h"
 #include "oui_lookup.h"
 #include "config.h"
 #include <NimBLEDevice.h>
@@ -7,291 +7,555 @@
 #include "gps_manager.h"
 #include <SD.h>
 
-struct BLEAlertRule {
-    const char* nameContains;
-    const char* ouiPrefix;
-    const char* serviceUUID;
-    const char* mfrContains;  
-    const char* typeContains; 
-    const char* label;
+struct BLEAlertRule
+{
+    const char *nameContains;
+    const char *ouiPrefix;
+    const char *serviceUUID;
+    const char *mfrContains;
+    const char *typeContains;
+    const char *label;
 };
 
 static const BLEAlertRule alertRules[] = {
-    { "flipper",  nullptr,    nullptr, nullptr, nullptr, "Flipper Zero"               },
-    { nullptr,    nullptr,    "3081",  nullptr, nullptr, "Flipper Zero (Black)"       },
-    { nullptr,    nullptr,    "3082",  nullptr, nullptr, "Flipper Zero (White)"       },
-    { nullptr,    nullptr,    "3083",  nullptr, nullptr, "Flipper Zero (Transparent)" },
-    { nullptr,    "80:7d:3a", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"         },
-    { nullptr,    "80:e1:26", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"         },
-    { nullptr,    "80:e1:27", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"         },
-    { nullptr,    "0c:fa:22", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"         },
-    { "pwn",      nullptr,    nullptr, "Raspberry Pi",nullptr, "Pwnagotchi Rig"     },
-    { "marauder", nullptr,    nullptr, "Espressif",   nullptr, "ESP32 Marauder"     }
+    {"flipper", nullptr, nullptr, nullptr, nullptr, "Flipper Zero"},
+    {nullptr, nullptr, "3081", nullptr, nullptr, "Flipper Zero (Black)"},
+    {nullptr, nullptr, "3082", nullptr, nullptr, "Flipper Zero (White)"},
+    {nullptr, nullptr, "3083", nullptr, nullptr, "Flipper Zero (Transparent)"},
+    {nullptr, "80:7d:3a", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"},
+    {nullptr, "80:e1:26", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"},
+    {nullptr, "80:e1:27", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"},
+    {nullptr, "0c:fa:22", nullptr, nullptr, nullptr, "Flipper Zero (OUI)"}
+
 };
 
 static const int alertRuleCount = sizeof(alertRules) / sizeof(alertRules[0]);
 
 BLEResult bleResults[40];
-int       bleCount      = 0;
-bool      bleScanActive = false;
+int bleCount = 0;
+bool bleScanActive = false;
 
-static bool           _bleInitialised = false;
-static uint32_t       _scanStartTime  = 0;
-static NimBLEScan*    _pScan          = nullptr;
-static bool           _radarMode      = false;
-static const uint32_t RADAR_SWEEP_MS  = 5000;
+static bool _bleInitialised = false;
+static uint32_t _scanStartTime = 0;
+static NimBLEScan *_pScan = nullptr;
+static bool _radarMode = false;
+static const uint32_t RADAR_SWEEP_MS = 5000;
 uint32_t bleAlertsLoggedTotal = 0;
 
-static String buildDeviceType(const NimBLEAdvertisedDevice* device, const String& addr, bool isPublic, String& outManufacturer, bool isMesh) {
-    if (isMesh) { outManufacturer = "Meshtastic"; return "Meshtastic Node"; }
+static String buildDeviceType(const NimBLEAdvertisedDevice *device, const String &addr, bool isPublic, String &outManufacturer, bool isMesh)
+{
+    if (isMesh)
+    {
+        outManufacturer = "Meshtastic";
+        return "Meshtastic Node";
+    }
 
-    String mfrFromId = ""; String mfrFromOUI = lookupOUI(addr);
-    if (device->haveManufacturerData()) {
-        std::string rawStd = device->getManufacturerData(); const uint8_t* data = (const uint8_t*)rawStd.data(); size_t len = rawStd.size();
-        if (len >= 2) {
-            uint16_t mfrId = (uint16_t)data[0] | ((uint16_t)data[1] << 8); mfrFromId = decodeManufacturerID(mfrId);
-            if (mfrId == 0x004C && len >= 3) { outManufacturer = "Apple"; return "Apple " + decodeAppleType(data[2]); }
+    String mfrFromId = "";
+    String mfrFromOUI = lookupOUI(addr);
+    if (device->haveManufacturerData())
+    {
+        std::string rawStd = device->getManufacturerData();
+        const uint8_t *data = (const uint8_t *)rawStd.data();
+        size_t len = rawStd.size();
+        if (len >= 2)
+        {
+            uint16_t mfrId = (uint16_t)data[0] | ((uint16_t)data[1] << 8);
+            mfrFromId = decodeManufacturerID(mfrId);
+            if (mfrId == 0x004C && len >= 3)
+            {
+                outManufacturer = "Apple";
+                return "Apple " + decodeAppleType(data[2]);
+            }
         }
     }
-    if (!mfrFromId.isEmpty()) outManufacturer = mfrFromId;
-    else if (!mfrFromOUI.isEmpty() && mfrFromOUI != "Random/Spoofed" && mfrFromOUI != "Broadcast") outManufacturer = mfrFromOUI;
-    else outManufacturer = isPublic ? "Unknown Public" : "Random MAC";
+    if (!mfrFromId.isEmpty())
+        outManufacturer = mfrFromId;
+    else if (!mfrFromOUI.isEmpty() && mfrFromOUI != "Random/Spoofed" && mfrFromOUI != "Broadcast")
+        outManufacturer = mfrFromOUI;
+    else
+        outManufacturer = isPublic ? "Unknown Public" : "Random MAC";
 
-    if (device->haveAppearance()) { String fromAppearance = decodeAppearance(device->getAppearance()); if (!fromAppearance.isEmpty()) return fromAppearance; }
+    if (device->haveAppearance())
+    {
+        String fromAppearance = decodeAppearance(device->getAppearance());
+        if (!fromAppearance.isEmpty())
+            return fromAppearance;
+    }
     int svcCount = device->getServiceUUIDCount();
-    for (int i = 0; i < svcCount; i++) { String uuid = device->getServiceUUID(i).toString().c_str(); String fromService = decodeServiceUUID(uuid); if (!fromService.isEmpty()) return fromService; }
-    if (!mfrFromOUI.isEmpty() && mfrFromOUI != "Random/Spoofed") return mfrFromOUI + " Device";
+    for (int i = 0; i < svcCount; i++)
+    {
+        String uuid = device->getServiceUUID(i).toString().c_str();
+        String fromService = decodeServiceUUID(uuid);
+        if (!fromService.isEmpty())
+            return fromService;
+    }
+    if (!mfrFromOUI.isEmpty() && mfrFromOUI != "Random/Spoofed")
+        return mfrFromOUI + " Device";
     return isPublic ? "Unknown Device" : "Private Device";
 }
 
-static bool checkAlert(const String& addr, const String& name, const String& mfr, const String& dtype, const NimBLEAdvertisedDevice* device, String& outLabel) {
-    String prefix = addr.substring(0, 8); prefix.toLowerCase(); String nameLower = name; nameLower.toLowerCase(); String mfrLower = mfr; mfrLower.toLowerCase(); String dtypeLower = dtype; dtypeLower.toLowerCase();
+static bool checkAlert(const String &addr, const String &name, const String &mfr, const String &dtype, const NimBLEAdvertisedDevice *device, String &outLabel)
+{
+    String prefix = addr.substring(0, 8);
+    prefix.toLowerCase();
+    String nameLower = name;
+    nameLower.toLowerCase();
+    String mfrLower = mfr;
+    mfrLower.toLowerCase();
+    String dtypeLower = dtype;
+    dtypeLower.toLowerCase();
 
-    static String uuids[5]; int uuidCount = 0; int svcCount = device->getServiceUUIDCount();
-    for (int u = 0; u < svcCount && uuidCount < 5; u++) { String ustr = device->getServiceUUID(u).toString().c_str(); ustr.toLowerCase(); bool dup = false; for (int d = 0; d < uuidCount; d++) if (uuids[d] == ustr) { dup = true; break; } if (!dup) uuids[uuidCount++] = ustr; }
+    static String uuids[5];
+    int uuidCount = 0;
+    int svcCount = device->getServiceUUIDCount();
+    for (int u = 0; u < svcCount && uuidCount < 5; u++)
+    {
+        String ustr = device->getServiceUUID(u).toString().c_str();
+        ustr.toLowerCase();
+        bool dup = false;
+        for (int d = 0; d < uuidCount; d++)
+            if (uuids[d] == ustr)
+            {
+                dup = true;
+                break;
+            }
+        if (!dup)
+            uuids[uuidCount++] = ustr;
+    }
 
-    for (int i = 0; i < alertRuleCount; i++) {
+    for (int i = 0; i < alertRuleCount; i++)
+    {
         bool nameMatch = alertRules[i].nameContains && nameLower.indexOf(alertRules[i].nameContains) >= 0;
-        bool ouiMatch  = alertRules[i].ouiPrefix    && prefix == alertRules[i].ouiPrefix;
-        bool mfrMatch = false; if (alertRules[i].mfrContains) { String ruleMfr = alertRules[i].mfrContains; ruleMfr.toLowerCase(); mfrMatch = (mfrLower.indexOf(ruleMfr) >= 0); }
-        bool typeMatch = false; if (alertRules[i].typeContains) { String ruleType = alertRules[i].typeContains; ruleType.toLowerCase(); typeMatch = (dtypeLower.indexOf(ruleType) >= 0); }
-        bool uuidMatch = false; if (alertRules[i].serviceUUID) { String t = alertRules[i].serviceUUID; t.toLowerCase(); for (int u = 0; u < uuidCount; u++) if (uuids[u].indexOf(t) >= 0) { uuidMatch = true; break; } }
+        bool ouiMatch = alertRules[i].ouiPrefix && prefix == alertRules[i].ouiPrefix;
+        bool mfrMatch = false;
+        if (alertRules[i].mfrContains)
+        {
+            String ruleMfr = alertRules[i].mfrContains;
+            ruleMfr.toLowerCase();
+            mfrMatch = (mfrLower.indexOf(ruleMfr) >= 0);
+        }
+        bool typeMatch = false;
+        if (alertRules[i].typeContains)
+        {
+            String ruleType = alertRules[i].typeContains;
+            ruleType.toLowerCase();
+            typeMatch = (dtypeLower.indexOf(ruleType) >= 0);
+        }
+        bool uuidMatch = false;
+        if (alertRules[i].serviceUUID)
+        {
+            String t = alertRules[i].serviceUUID;
+            t.toLowerCase();
+            for (int u = 0; u < uuidCount; u++)
+                if (uuids[u].indexOf(t) >= 0)
+                {
+                    uuidMatch = true;
+                    break;
+                }
+        }
 
-        if (nameMatch || ouiMatch || uuidMatch || mfrMatch || typeMatch) { outLabel = alertRules[i].label; return true; }
+        if (nameMatch || ouiMatch || uuidMatch || mfrMatch || typeMatch)
+        {
+            outLabel = alertRules[i].label;
+            return true;
+        }
     }
     return false;
 }
 
-class ScanCallback : public NimBLEScanCallbacks {
+class ScanCallback : public NimBLEScanCallbacks
+{
 public:
-    void onResult(const NimBLEAdvertisedDevice* device) override {
-        if (!device) return;
+    void onResult(const NimBLEAdvertisedDevice *device) override
+    {
+        if (!device)
+            return;
         String addr = device->getAddress().toString().c_str();
-        for (int i = 0; i < bleCount; i++) if (bleResults[i].address == addr) { bleResults[i].rssi = device->getRSSI(); return; }
-        if (bleCount >= 40) return;
+        for (int i = 0; i < bleCount; i++)
+            if (bleResults[i].address == addr)
+            {
+                bleResults[i].rssi = device->getRSSI();
+                return;
+            }
+        if (bleCount >= 40)
+            return;
 
-        String name = device->haveName() ? device->getName().c_str() : ""; int rssi = device->getRSSI();
-        uint8_t addrType = device->getAddress().getType(); bool isPublic = (addrType == 0 || addrType == 2);
+        String name = device->haveName() ? device->getName().c_str() : "";
+        int rssi = device->getRSSI();
+        uint8_t addrType = device->getAddress().getType();
+        bool isPublic = (addrType == 0 || addrType == 2);
 
-        bool isMesh = false; bool isNewMesh = false;
+        bool isMesh = false;
+        bool isNewMesh = false;
         meshProcessDevice(device, name, addr, isMesh, isNewMesh);
 
-        String manufacturer = ""; String deviceType = buildDeviceType(device, addr, isPublic, manufacturer, isMesh);
-        if (!name.isEmpty() && deviceType == "Private Device") deviceType = "Named Device";
+        String manufacturer = "";
+        String deviceType = buildDeviceType(device, addr, isPublic, manufacturer, isMesh);
+        if (!name.isEmpty() && deviceType == "Private Device")
+            deviceType = "Named Device";
 
-        String alertLabel = ""; 
+        String alertLabel = "";
         bool isAlert = checkAlert(addr, name, manufacturer, deviceType, device, alertLabel);
 
-        BLEResult& r   = bleResults[bleCount];
-        r.address      = addr;
-        r.name         = name;
-        r.rssi         = rssi;
+        BLEResult &r = bleResults[bleCount];
+        r.address = addr;
+        r.name = name;
+        r.rssi = rssi;
         r.manufacturer = manufacturer;
-        r.deviceType   = deviceType;
-        r.isAlert      = isAlert;   
-        r.isMeshtastic = isMesh;  
-        r.isNewMeshtastic = isNewMesh; 
-        r.alertLabel   = alertLabel;
+        r.deviceType = deviceType;
+        r.isAlert = isAlert;
+        r.isMeshtastic = isMesh;
+        r.isNewMeshtastic = isNewMesh;
+        r.alertLabel = alertLabel;
         r.isPublicAddr = isPublic;
-        r.isKnown      = false;
+        r.isKnown = false;
         bleCount++;
 
-        if (r.isAlert) {
+        if (r.isAlert)
+        {
             Serial.printf("[BLE] !!! THREAT: %s [%s] %s | %s | %d dBm\n", addr.c_str(), alertLabel.c_str(), manufacturer.c_str(), name.isEmpty() ? deviceType.c_str() : name.c_str(), rssi);
-        } else if (r.isNewMeshtastic) {
-            Serial.printf("[BLE] # NEW Meshtastic Acquired: %s | %s | %d dBm\n", addr.c_str(), name.isEmpty() ? deviceType.c_str() : name.c_str(), rssi);
-        } else if (r.isMeshtastic) {
+        }
+        else if (r.isNewMeshtastic)
+        {
+            Serial.printf("[BLE] # NEW Meshtastic Node Seen: %s | %s | %d dBm\n", addr.c_str(), name.isEmpty() ? deviceType.c_str() : name.c_str(), rssi);
+        }
+        else if (r.isMeshtastic)
+        {
             Serial.printf("[BLE] # Seen Meshtastic: %s | %d dBm\n", addr.c_str(), rssi);
-        } else if (!_radarMode) {
+        }
+        else if (!_radarMode)
+        {
             Serial.printf("[BLE] Found: %-20s | %-25s | %-20s | %d dBm\n", addr.c_str(), (!name.isEmpty() ? name : deviceType).c_str(), manufacturer.c_str(), rssi);
         }
     }
-    void onScanEnd(const NimBLEScanResults& results, int reason) override { Serial.printf("[BLE] Scan ended (reason %d, %d devices)\n", reason, bleCount); bleScanActive = false; }
+    void onScanEnd(const NimBLEScanResults &results, int reason) override
+    {
+        Serial.printf("[BLE] Scan ended (reason %d, %d devices)\n", reason, bleCount);
+        bleScanActive = false;
+    }
 };
 
 static ScanCallback _scanCallback;
 
-static void logAlertsToSD() {
-    if (!sdActive) return;
+static void logAlertsToSD()
+{
+    if (!sdActive)
+        return;
 
     int alertCount = 0;
-    for (int i = 0; i < bleCount; i++) if (bleResults[i].isAlert) alertCount++;
-    if (alertCount == 0) return;
+    for (int i = 0; i < bleCount; i++)
+        if (bleResults[i].isAlert)
+            alertCount++;
+    if (alertCount == 0)
+        return;
 
-    if (!SD.exists("/ble_alerts")) SD.mkdir("/ble_alerts");
-    char dateBuf[16]; LocalTime lt = gpsGetLocalTime();
-    if (lt.valid) snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", lt.year, lt.month, lt.day);
-    else if (gpsData.year > 2000) snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", gpsData.year, gpsData.month, gpsData.day);
-    else strcpy(dateBuf, "NODATE");
+    if (!SD.exists("/ble_alerts"))
+        SD.mkdir("/ble_alerts");
+    char dateBuf[16];
+    LocalTime lt = gpsGetLocalTime();
+    if (lt.valid)
+        snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", lt.year, lt.month, lt.day);
+    else if (gpsData.year > 2000)
+        snprintf(dateBuf, sizeof(dateBuf), "%04d%02d%02d", gpsData.year, gpsData.month, gpsData.day);
+    else
+        strcpy(dateBuf, "NODATE");
 
-    char pathBuf[48]; snprintf(pathBuf, sizeof(pathBuf), "/ble_alerts/BLE_%s.csv", dateBuf);
-    bool isNew = !SD.exists(pathBuf); File f = SD.open(pathBuf, FILE_APPEND);
-    if (!f) { Serial.println("[BLE Log] ERROR: could not open file"); return; }
-    if (isNew) f.println("time,lat,lon,alt,sats,address,name,alert_label,device_type,manufacturer,rssi,addr_type");
+    char pathBuf[48];
+    snprintf(pathBuf, sizeof(pathBuf), "/ble_alerts/BLE_%s.csv", dateBuf);
+    bool isNew = !SD.exists(pathBuf);
+    File f = SD.open(pathBuf, FILE_APPEND);
+    if (!f)
+    {
+        Serial.println("[BLE Log] ERROR: could not open file");
+        return;
+    }
+    if (isNew)
+        f.println("time,lat,lon,alt,sats,address,name,alert_label,device_type,manufacturer,rssi,addr_type");
 
     char timeBuf[16];
-    if (lt.valid) snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", lt.hour, lt.minute, lt.second);
-    else snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", gpsData.hour, gpsData.minute, gpsData.second);
+    if (lt.valid)
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", lt.hour, lt.minute, lt.second);
+    else
+        snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", gpsData.hour, gpsData.minute, gpsData.second);
 
-    for (int i = 0; i < bleCount; i++) {
-        if (!bleResults[i].isAlert) continue;
-        const BLEResult& r = bleResults[i];
+    for (int i = 0; i < bleCount; i++)
+    {
+        if (!bleResults[i].isAlert)
+            continue;
+        const BLEResult &r = bleResults[i];
 
-        String name = r.name.isEmpty() ? "Unknown" : r.name; String mfr = r.manufacturer.isEmpty() ? "Unknown" : r.manufacturer;
-        String label = r.alertLabel; String dtype = r.deviceType;
-        name.replace(",", ";"); mfr.replace(",", ";"); label.replace(",", ";"); dtype.replace(",", ";");
+        String name = r.name.isEmpty() ? "Unknown" : r.name;
+        String mfr = r.manufacturer.isEmpty() ? "Unknown" : r.manufacturer;
+        String label = r.alertLabel;
+        String dtype = r.deviceType;
+        name.replace(",", ";");
+        mfr.replace(",", ";");
+        label.replace(",", ";");
+        dtype.replace(",", ";");
 
         char line[384];
         snprintf(line, sizeof(line), "%s,%.6f,%.6f,%.1f,%d,%s,%s,%s,%s,%s,%d,%s",
                  timeBuf, gpsData.latitude, gpsData.longitude, gpsData.altitude, gpsData.satellites,
-                 r.address.c_str(), name.c_str(), label.c_str(), dtype.c_str(), mfr.c_str(), r.rssi, r.isPublicAddr ? "Public" : "Random"); f.println(line);
-        bleAlertsLoggedTotal++; 
+                 r.address.c_str(), name.c_str(), label.c_str(), dtype.c_str(), mfr.c_str(), r.rssi, r.isPublicAddr ? "Public" : "Random");
+        f.println(line);
+        bleAlertsLoggedTotal++;
     }
     f.close();
     Serial.printf("[BLE Log] %d threat(s) saved to %s\n", alertCount, pathBuf);
 }
 
-void bleBegin() {
-    if (_bleInitialised) return;
+void bleBegin()
+{
+    if (_bleInitialised)
+        return;
     Serial.println("[BLE] Radio Initializing...");
-    NimBLEDevice::init("CLUNCHI"); _pScan = NimBLEDevice::getScan();
-    if (!_pScan) { Serial.println("[BLE] ERROR: getScan() returned null!"); return; }
-    _pScan->setScanCallbacks(&_scanCallback, false); _pScan->setActiveScan(true); _pScan->setInterval(100); _pScan->setWindow(99);
-    _bleInitialised = true; bleScanActive = false; bleCount = 0; 
-    meshBegin(); 
+    NimBLEDevice::init("CLUNCHI");
+    _pScan = NimBLEDevice::getScan();
+    if (!_pScan)
+    {
+        Serial.println("[BLE] ERROR: getScan() returned null!");
+        return;
+    }
+    _pScan->setScanCallbacks(&_scanCallback, false);
+    _pScan->setActiveScan(true);
+    _pScan->setInterval(100);
+    _pScan->setWindow(99);
+    _bleInitialised = true;
+    bleScanActive = false;
+    bleCount = 0;
+    meshBegin();
     Serial.println("[BLE] Radio Ready.");
 }
 
-void bleDeinit() {
-    if (!_bleInitialised) return;
+void bleDeinit()
+{
+    if (!_bleInitialised)
+        return;
     Serial.println("[BLE] Deinitializing Radio...");
-    if (_pScan) { if (bleScanActive) { _pScan->stop(); delay(100); } _pScan = nullptr; }
-    bleScanActive = false; _radarMode = false; NimBLEDevice::deinit(true); _bleInitialised = false; bleCount = 0;
+    if (_pScan)
+    {
+        if (bleScanActive)
+        {
+            _pScan->stop();
+            delay(100);
+        }
+        _pScan = nullptr;
+    }
+    bleScanActive = false;
+    _radarMode = false;
+    NimBLEDevice::deinit(true);
+    _bleInitialised = false;
+    bleCount = 0;
     meshEnd();
     Serial.println("[BLE] Radio Offline.");
 }
 
 bool isBleInitialised() { return _bleInitialised; }
 
-void bleStartScan() {
-    if (!_bleInitialised) { Serial.println("[BLE] Error: Call bleBegin first."); return; }
-    if (bleScanActive) return;
-    if (!_pScan) { Serial.println("[BLE] Error: _pScan is null!"); return; }
+void bleStartScan()
+{
+    if (!_bleInitialised)
+    {
+        Serial.println("[BLE] Error: Call bleBegin first.");
+        return;
+    }
+    if (bleScanActive)
+        return;
+    if (!_pScan)
+    {
+        Serial.println("[BLE] Error: _pScan is null!");
+        return;
+    }
     Serial.println("[BLE] Scanning started...");
-    bleCount = 0; _scanStartTime = millis(); bleScanActive = true; _pScan->clearResults();
-    if (!_pScan->start(0, false)) { Serial.println("[BLE] ERROR: scan start failed!"); bleScanActive = false; }
+    bleCount = 0;
+    _scanStartTime = millis();
+    bleScanActive = true;
+    _pScan->clearResults();
+    if (!_pScan->start(0, false))
+    {
+        Serial.println("[BLE] ERROR: scan start failed!");
+        bleScanActive = false;
+    }
 }
 
-void bleStopScan() {
-    if (!_pScan || !bleScanActive) return; _pScan->stop(); bleScanActive = false; Serial.println("[BLE] Scanning stopped.");
+void bleStopScan()
+{
+    if (!_pScan || !bleScanActive)
+        return;
+    _pScan->stop();
+    bleScanActive = false;
+    Serial.println("[BLE] Scanning stopped.");
 }
 
-void bleCancelScan() {
-    if (!_bleInitialised) return;
-    if (_pScan && bleScanActive) { _pScan->stop(); delay(50); _pScan->clearResults(); }
-    bleScanActive = false; bleCount = 0;
+void bleCancelScan()
+{
+    if (!_bleInitialised)
+        return;
+    if (_pScan && bleScanActive)
+    {
+        _pScan->stop();
+        delay(50);
+        _pScan->clearResults();
+    }
+    bleScanActive = false;
+    bleCount = 0;
 }
 
 uint32_t bleScanStartTime() { return _scanStartTime; }
 
-void bleStartRadar() {
-    if (!_bleInitialised) bleBegin();
-    if (!_pScan) return;
-    _radarMode = true; bleCount = 0; bleAlertsLoggedTotal = 0; _scanStartTime = millis(); bleScanActive = true;
-    _pScan->clearResults(); _pScan->start(0, false);
+void bleStartRadar()
+{
+    if (!_bleInitialised)
+        bleBegin();
+    if (!_pScan)
+        return;
+    _radarMode = true;
+    bleCount = 0;
+    bleAlertsLoggedTotal = 0;
+    _scanStartTime = millis();
+    bleScanActive = true;
+    _pScan->clearResults();
+    _pScan->start(0, false);
     Serial.println("[BLE] Radar scanning started.");
 }
 
-void bleStopRadar() {
-    _radarMode = false; if (_pScan && bleScanActive) { _pScan->stop(); delay(50); }
-    bleScanActive = false; bleCount = 0; Serial.println("[BLE] Radar scanning stopped.");
+void bleStopRadar()
+{
+    _radarMode = false;
+    if (_pScan && bleScanActive)
+    {
+        _pScan->stop();
+        delay(50);
+    }
+    bleScanActive = false;
+    bleCount = 0;
+    Serial.println("[BLE] Radar scanning stopped.");
 }
 
-void bleForceSweep() {
-    if (!_bleInitialised || !_radarMode || !_pScan) return;
-    if (bleScanActive) { _pScan->stop(); delay(50); }
-    bleScanActive = false; bleCount = 0; _scanStartTime = millis(); _pScan->clearResults();
-    bleScanActive = true; _pScan->start(0, false);
+void bleForceSweep()
+{
+    if (!_bleInitialised || !_radarMode || !_pScan)
+        return;
+    if (bleScanActive)
+    {
+        _pScan->stop();
+        delay(50);
+    }
+    bleScanActive = false;
+    bleCount = 0;
+    _scanStartTime = millis();
+    _pScan->clearResults();
+    bleScanActive = true;
+    _pScan->start(0, false);
     Serial.println("[BLE] Forced sweep started.");
 }
 
-void bleUpdate() {
-    if (!_bleInitialised || !_pScan) return;
+void bleUpdate()
+{
+    if (!_bleInitialised || !_pScan)
+        return;
 
-    if (_radarMode) {
-        if (bleScanActive && millis() - _scanStartTime > RADAR_SWEEP_MS) {
-            _pScan->stop(); bleScanActive = false;
+    if (_radarMode)
+    {
+        if (bleScanActive && millis() - _scanStartTime > RADAR_SWEEP_MS)
+        {
+            _pScan->stop();
+            bleScanActive = false;
             Serial.printf("[BLE Radar] Sweep done: %d devices, %d alerts\n", bleCount, bleAlertCount());
-            if (bleHasAlerts())  { blePrintAlerts(); logAlertsToSD(); }
+            if (bleHasAlerts())
+            {
+                blePrintAlerts();
+                logAlertsToSD();
+            }
             meshLogToSD(bleResults, bleCount);
         }
-        if (!bleScanActive) {
-            bleCount = 0; _scanStartTime = millis(); bleScanActive = true;
-            _pScan->clearResults(); _pScan->start(0, false);
+        if (!bleScanActive)
+        {
+            bleCount = 0;
+            _scanStartTime = millis();
+            bleScanActive = true;
+            _pScan->clearResults();
+            _pScan->start(0, false);
         }
         return;
     }
 
-    if (!bleScanActive) return;
+    if (!bleScanActive)
+        return;
 
-    if (millis() - _scanStartTime > BLE_SCAN_DURATION) {
-        _pScan->stop(); bleScanActive = false; blePrintInfo();
-        if (bleHasAlerts())  { blePrintAlerts(); logAlertsToSD(); }
-        meshLogToSD(bleResults, bleCount); 
+    if (millis() - _scanStartTime > BLE_SCAN_DURATION)
+    {
+        _pScan->stop();
+        bleScanActive = false;
+        blePrintInfo();
+        if (bleHasAlerts())
+        {
+            blePrintAlerts();
+            logAlertsToSD();
+        }
+        meshLogToSD(bleResults, bleCount);
     }
 }
 
-int bleAlertCount() { int count = 0; for (int i = 0; i < bleCount; i++) if (bleResults[i].isAlert) count++; return count; }
+int bleAlertCount()
+{
+    int count = 0;
+    for (int i = 0; i < bleCount; i++)
+        if (bleResults[i].isAlert)
+            count++;
+    return count;
+}
 bool bleHasAlerts() { return bleAlertCount() > 0; }
 
-void bleGetSortedIndices(int* idx, int count) {
-    for (int i = 0; i < count; i++) idx[i] = i;
-    for (int i = 0; i < count - 1; i++) {
-        for (int j = i + 1; j < count; j++) {
-            if (bleResults[idx[j]].rssi > bleResults[idx[i]].rssi) { int tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp; }
+void bleGetSortedIndices(int *idx, int count)
+{
+    for (int i = 0; i < count; i++)
+        idx[i] = i;
+    for (int i = 0; i < count - 1; i++)
+    {
+        for (int j = i + 1; j < count; j++)
+        {
+            if (bleResults[idx[j]].rssi > bleResults[idx[i]].rssi)
+            {
+                int tmp = idx[i];
+                idx[i] = idx[j];
+                idx[j] = tmp;
+            }
         }
     }
 }
 
-void blePrintInfo() {
-    if (bleCount == 0) { Serial.println("[BLE] No devices found."); return; }
+void blePrintInfo()
+{
+    if (bleCount == 0)
+    {
+        Serial.println("[BLE] No devices found.");
+        return;
+    }
     Serial.println("\n[BLE] ==========================================");
     Serial.printf("[BLE]  Scan Complete: %d device%s found\n", bleCount, bleCount == 1 ? "" : "s");
     Serial.println("[BLE] ==========================================");
-    for (int i = 0; i < bleCount; i++) {
-        const BLEResult& r = bleResults[i]; String displayName = !r.name.isEmpty() ? r.name : r.deviceType;
+    for (int i = 0; i < bleCount; i++)
+    {
+        const BLEResult &r = bleResults[i];
+        String displayName = !r.name.isEmpty() ? r.name : r.deviceType;
         Serial.printf("[BLE]  %2d: %-20s | %-25s | %-20s | %d dBm%s%s%s\n", i + 1, r.address.c_str(), displayName.c_str(), r.manufacturer.c_str(), r.rssi, r.isKnown ? " [KNOWN]" : "", r.isAlert ? " [!THREAT]" : "", r.isMeshtastic ? " [#MESH]" : "");
     }
     Serial.println("[BLE] ==========================================\n");
 }
 
-void blePrintAlerts() {
-    int alerts = bleAlertCount(); if (alerts == 0) return;
+void blePrintAlerts()
+{
+    int alerts = bleAlertCount();
+    if (alerts == 0)
+        return;
     Serial.printf("[BLE] !!! %d THREATS DETECTED !!!\n", alerts);
     Serial.println("[BLE] ------------------------------------------");
-    for (int i = 0; i < bleCount; i++) {
-        if (!bleResults[i].isAlert) continue;
-        const BLEResult& r = bleResults[i];
+    for (int i = 0; i < bleCount; i++)
+    {
+        if (!bleResults[i].isAlert)
+            continue;
+        const BLEResult &r = bleResults[i];
         Serial.printf("[BLE] ! THREAT | %-18s | %s | %s | %d dBm\n", r.alertLabel.c_str(), r.address.c_str(), r.name.isEmpty() ? r.deviceType.c_str() : r.name.c_str(), r.rssi);
     }
     Serial.println("[BLE] ------------------------------------------\n");

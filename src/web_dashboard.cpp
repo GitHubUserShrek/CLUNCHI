@@ -1,144 +1,195 @@
 #include "web_dashboard.h"
 #include "wifi_manager.h"
-#include "wids.h"          
+#include "wids.h"
 #include "net_health.h"
 #include <WebServer.h>
 #include <esp_wifi.h>
 #include <WiFi.h>
 
-static WebServer* _server = nullptr;
+static WebServer *_server = nullptr;
 static bool _active = false;
 
 #define MAX_CONN_EVENTS 10
-struct ConnEvent {
+struct ConnEvent
+{
     uint32_t timestamp;
-    bool     connected;
-    int8_t   rssi;
+    bool connected;
+    int8_t rssi;
 };
 static ConnEvent _connHistory[MAX_CONN_EVENTS];
-static int  _connHistoryCount = 0;
-static bool _wasConnected     = false;
+static int _connHistoryCount = 0;
+static bool _wasConnected = false;
 
 static uint32_t _lastDnsLatency = 0;
 
 #define MAX_NEARBY 10
-struct NearbyAP {
-    String  ssid;
-    String  bssid;
-    int8_t  rssi;
+struct NearbyAP
+{
+    String ssid;
+    String bssid;
+    int8_t rssi;
     uint8_t channel;
-    bool    isOpen;
+    bool isOpen;
 };
-static NearbyAP  _nearbyAPs[MAX_NEARBY];
-static int       _nearbyCount    = 0;
-static uint32_t  _lastNearbyScan = 0;
+static NearbyAP _nearbyAPs[MAX_NEARBY];
+static int _nearbyCount = 0;
+static uint32_t _lastNearbyScan = 0;
 
-static void measureDnsLatency() {
-    if (!wifiConnected()) { _lastDnsLatency = 0; return; }
+static void measureDnsLatency()
+{
+    if (!wifiConnected())
+    {
+        _lastDnsLatency = 0;
+        return;
+    }
     IPAddress result;
-    uint32_t start   = millis();
-    int      err     = WiFi.hostByName("google.com", result);
+    uint32_t start = millis();
+    int err = WiFi.hostByName("google.com", result);
     uint32_t elapsed = millis() - start;
-    _lastDnsLatency  = (err == 1) ? elapsed : 9999;
+    _lastDnsLatency = (err == 1) ? elapsed : 9999;
 }
 
-static void updateNearbyScan() {
-    if (!wifiConnected()) return;
-    if (millis() - _lastNearbyScan < 60000 && _lastNearbyScan != 0) return;
+static void updateNearbyScan()
+{
+    if (!wifiConnected())
+        return;
+    if (millis() - _lastNearbyScan < 60000 && _lastNearbyScan != 0)
+        return;
 
     int n = WiFi.scanComplete();
-    if (n == WIFI_SCAN_FAILED) {
+    if (n == WIFI_SCAN_FAILED)
+    {
         WiFi.scanNetworks(true, false, true);
         _lastNearbyScan = millis();
         return;
     }
-    if (n < 0) return;
+    if (n < 0)
+        return;
 
     _nearbyCount = min(n, MAX_NEARBY);
-    for (int i = 0; i < _nearbyCount; i++) {
-        _nearbyAPs[i].ssid    = WiFi.SSID(i);
-        _nearbyAPs[i].bssid   = WiFi.BSSIDstr(i);
-        _nearbyAPs[i].rssi    = WiFi.RSSI(i);
+    for (int i = 0; i < _nearbyCount; i++)
+    {
+        _nearbyAPs[i].ssid = WiFi.SSID(i);
+        _nearbyAPs[i].bssid = WiFi.BSSIDstr(i);
+        _nearbyAPs[i].rssi = WiFi.RSSI(i);
         _nearbyAPs[i].channel = WiFi.channel(i);
-        _nearbyAPs[i].isOpen  = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+        _nearbyAPs[i].isOpen = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
     }
     WiFi.scanDelete();
     _lastNearbyScan = millis();
 }
 
-static void trackConnection() {
+static void trackConnection()
+{
     bool now = wifiConnected();
-    if (now != _wasConnected) {
-        if (_connHistoryCount < MAX_CONN_EVENTS) {
+    if (now != _wasConnected)
+    {
+        if (_connHistoryCount < MAX_CONN_EVENTS)
+        {
             _connHistory[_connHistoryCount].timestamp = millis() / 1000;
             _connHistory[_connHistoryCount].connected = now;
-            _connHistory[_connHistoryCount].rssi      = now ? (int8_t)wifiRSSI() : 0;
+            _connHistory[_connHistoryCount].rssi = now ? (int8_t)wifiRSSI() : 0;
             _connHistoryCount++;
         }
         _wasConnected = now;
     }
 }
 
-static void pauseBackground() {
-    if (widsActive) widsEnd();
+static void pauseBackground()
+{
+    if (widsActive)
+        widsEnd();
     netHealthEnd();
     esp_wifi_set_promiscuous(false);
     delay(50);
 }
 
-static void resumeBackground() {
-    if (wifiConnected()) {
+static void resumeBackground()
+{
+    if (wifiConnected())
+    {
         widsBegin();
         netHealthBegin();
     }
 }
 
-static String getSecurityType() {
+static String getSecurityType()
+{
     wifi_ap_record_t info;
-    if (esp_wifi_sta_get_ap_info(&info) != ESP_OK) return "UNKNOWN";
-    switch (info.authmode) {
-        case WIFI_AUTH_OPEN:            return "OPEN (NONE)";
-        case WIFI_AUTH_WEP:             return "WEP";
-        case WIFI_AUTH_WPA_PSK:         return "WPA-PSK";
-        case WIFI_AUTH_WPA2_PSK:        return "WPA2-PSK";
-        case WIFI_AUTH_WPA_WPA2_PSK:    return "WPA/WPA2-PSK";
-        case WIFI_AUTH_WPA3_PSK:        return "WPA3-PSK";
-        case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2/WPA3-PSK";
-        case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2-ENT";
-        default:                        return "OTHER";
+    if (esp_wifi_sta_get_ap_info(&info) != ESP_OK)
+        return "UNKNOWN";
+    switch (info.authmode)
+    {
+    case WIFI_AUTH_OPEN:
+        return "OPEN (NONE)";
+    case WIFI_AUTH_WEP:
+        return "WEP";
+    case WIFI_AUTH_WPA_PSK:
+        return "WPA-PSK";
+    case WIFI_AUTH_WPA2_PSK:
+        return "WPA2-PSK";
+    case WIFI_AUTH_WPA_WPA2_PSK:
+        return "WPA/WPA2-PSK";
+    case WIFI_AUTH_WPA3_PSK:
+        return "WPA3-PSK";
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+        return "WPA2/WPA3-PSK";
+    case WIFI_AUTH_WPA2_ENTERPRISE:
+        return "WPA2-ENT";
+    default:
+        return "OTHER";
     }
 }
 
-static String getCipherType() {
+static String getCipherType()
+{
     wifi_ap_record_t info;
-    if (esp_wifi_sta_get_ap_info(&info) != ESP_OK) return "UNKNOWN";
-    switch (info.pairwise_cipher) {
-        case WIFI_CIPHER_TYPE_NONE:      return "NONE";
-        case WIFI_CIPHER_TYPE_WEP40:     return "WEP40";
-        case WIFI_CIPHER_TYPE_WEP104:    return "WEP104";
-        case WIFI_CIPHER_TYPE_TKIP:      return "TKIP";
-        case WIFI_CIPHER_TYPE_CCMP:      return "AES-CCMP";
-        case WIFI_CIPHER_TYPE_TKIP_CCMP: return "TKIP+CCMP";
-        default:                         return "OTHER";
+    if (esp_wifi_sta_get_ap_info(&info) != ESP_OK)
+        return "UNKNOWN";
+    switch (info.pairwise_cipher)
+    {
+    case WIFI_CIPHER_TYPE_NONE:
+        return "NONE";
+    case WIFI_CIPHER_TYPE_WEP40:
+        return "WEP40";
+    case WIFI_CIPHER_TYPE_WEP104:
+        return "WEP104";
+    case WIFI_CIPHER_TYPE_TKIP:
+        return "TKIP";
+    case WIFI_CIPHER_TYPE_CCMP:
+        return "AES-CCMP";
+    case WIFI_CIPHER_TYPE_TKIP_CCMP:
+        return "TKIP+CCMP";
+    default:
+        return "OTHER";
     }
 }
 
-static int rssiBars(int32_t rssi) {
-    if (rssi >= -50) return 5;
-    if (rssi >= -60) return 4;
-    if (rssi >= -67) return 3;
-    if (rssi >= -75) return 2;
-    if (rssi >= -85) return 1;
+static int rssiBars(int32_t rssi)
+{
+    if (rssi >= -50)
+        return 5;
+    if (rssi >= -60)
+        return 4;
+    if (rssi >= -67)
+        return 3;
+    if (rssi >= -75)
+        return 2;
+    if (rssi >= -85)
+        return 1;
     return 0;
 }
 
-static String buildSignalBars(int32_t rssi) {
+static String buildSignalBars(int32_t rssi)
+{
     int bars = rssiBars(rssi);
     String html = "<div class='bars'>";
-    for (int i = 1; i <= 5; i++) {
+    for (int i = 1; i <= 5; i++)
+    {
         int h = 4 + (i * 1);
-        String color = (i <= bars) ?
-            ((bars >= 4) ? "#0f0" : (bars >= 2) ? "#ff0" : "#f00") : "#222";
+        String color = (i <= bars) ? ((bars >= 4) ? "#0f0" : (bars >= 2) ? "#ff0"
+                                                                         : "#f00")
+                                   : "#222";
         html += "<div class='bar' style='height:" + String(h) +
                 "px;background:" + color + ";'></div>";
     }
@@ -146,7 +197,8 @@ static String buildSignalBars(int32_t rssi) {
     return html;
 }
 
-static void sendHtmlHeader() {
+static void sendHtmlHeader()
+{
     _server->sendContent(F("<!DOCTYPE html><html><head>"));
     _server->sendContent(F("<title>CLUNCHI ANALYZER</title>"));
     _server->sendContent(F("<meta name='viewport' content='width=device-width,initial-scale=1'>"));
@@ -180,7 +232,8 @@ static void sendHtmlHeader() {
     _server->sendContent(F("<div class='subtitle'>TACTICAL WIDS DASHBOARD v2.0</div>"));
 }
 
-static void handleRoot() {
+static void handleRoot()
+{
     pauseBackground();
     measureDnsLatency();
 
@@ -191,7 +244,8 @@ static void handleRoot() {
 
     sendHtmlHeader();
 
-    auto sendRow = [](const char* label, String value, bool isWarn = false) {
+    auto sendRow = [](const char *label, String value, bool isWarn = false)
+    {
         String css = isWarn ? "v warn" : "v";
         _server->sendContent("<div class='r'><span>" + String(label) + "</span><span class='" + css + "'>" + value + "</span></div>");
     };
@@ -200,8 +254,8 @@ static void handleRoot() {
 
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// WIFI</span>"));
-    sendRow("SSID",    wifiCurrentSSID());
-    sendRow("BSSID",   wifiBSSID());
+    sendRow("SSID", wifiCurrentSSID());
+    sendRow("BSSID", wifiBSSID());
     sendRow("Channel", String(wifiConnectedChannel()));
 
     _server->sendContent(
@@ -217,39 +271,44 @@ static void handleRoot() {
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// WIRELESS IDS (WIDS)</span>"));
 
-    uint8_t threat   = widsThreatScore();
-    bool    underAtk = widsUnderAttack();
-    String  threatLbl = (threat >= 70) ? "HIGH" : (threat >= 30) ? "MEDIUM" : "LOW";
+    uint8_t threat = widsThreatScore();
+    bool underAtk = widsUnderAttack();
+    String threatLbl = (threat >= 70) ? "HIGH" : (threat >= 30) ? "MEDIUM"
+                                                                : "LOW";
 
-    sendRow("Total Incidents", String(widsTotalCount),         widsTotalCount > 0);
-    sendRow("Recent (10s)",    String(widsRecentCount(10000)), widsRecentCount(10000) > 0);
-    sendRow("Unique Attackers",String(widsUniqueSourceCount()));
-    sendRow("Threat Score",    String(threat) + "/100 [" + threatLbl + "]", threat >= 30);
-    sendRow("Under Attack",    underAtk ? "YES" : "NO", underAtk);
+    sendRow("Total Incidents", String(widsTotalCount), widsTotalCount > 0);
+    sendRow("Recent (10s)", String(widsRecentCount(10000)), widsRecentCount(10000) > 0);
+    sendRow("Unique Attackers", String(widsUniqueSourceCount()));
+    sendRow("Threat Score", String(threat) + "/100 [" + threatLbl + "]", threat >= 30);
+    sendRow("Under Attack", underAtk ? "YES" : "NO", underAtk);
 
     int topIdx = widsMostActiveSourceIndex();
-    if (topIdx >= 0 && widsLogCount > 0) {
+    if (topIdx >= 0 && widsLogCount > 0)
+    {
         sendRow("Top Attacker", widsMacToString(widsLog[topIdx].source), true);
     }
 
-    if (underAtk) {
+    if (underAtk)
+    {
         _server->sendContent(F("<div class='alert-box'>&#9888; ACTIVE WIRELESS ATTACK DETECTED</div>"));
     }
 
-    if (widsLogCount > 0) {
+    if (widsLogCount > 0)
+    {
         _server->sendContent(F("<table><tr><th>TYPE</th><th>SOURCE</th><th>TARGET</th><th>RSSI</th><th>PARAM</th></tr>"));
         int count = min(widsLogCount, 5);
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < count; i++)
+        {
             int idx = (widsLogHead - 1 - i + WIDS_LOG_SIZE) % WIDS_LOG_SIZE;
-            ThreatEvent& e = widsLog[idx];
-            
-            String rowCss  = (e.isTargeted || e.type == ATTACK_EVIL_TWIN) ? "warn" : "ok";
-            String typeShort = String(widsAttackTypeString(e.type)).substring(0, 4); 
-            
+            ThreatEvent &e = widsLog[idx];
+
+            String rowCss = (e.isTargeted || e.type == ATTACK_EVIL_TWIN) ? "warn" : "ok";
+            String typeShort = String(widsAttackTypeString(e.type)).substring(0, 4);
+
             _server->sendContent("<tr class='" + rowCss + "'><td>");
             _server->sendContent(typeShort);
             _server->sendContent("</td><td>");
-            _server->sendContent(widsMacToString(e.source).substring(9)); 
+            _server->sendContent(widsMacToString(e.source).substring(9));
             _server->sendContent("</td><td>");
             _server->sendContent(e.isBroadcast ? "ALL" : (e.isTargeted ? "YOU" : "AIR"));
             _server->sendContent("</td><td>");
@@ -259,7 +318,9 @@ static void handleRoot() {
             _server->sendContent("</td></tr>");
         }
         _server->sendContent(F("</table>"));
-    } else {
+    }
+    else
+    {
         _server->sendContent(F("<div class='empty'>AIRSPACE IS CLEAN. NO ATTACKS DETECTED.</div>"));
     }
     _server->sendContent(F("</div>"));
@@ -268,23 +329,25 @@ static void handleRoot() {
     _server->sendContent(F("<span class='sec-h'>// L3 CONNECTIVITY</span>"));
 
     String gradeStr = String(netGradeLabel(nhStats.grade));
-    bool   gradeBad = (nhStats.grade >= NetGrade::DEGRADED);
-    sendRow("Grade",    gradeStr, gradeBad);
+    bool gradeBad = (nhStats.grade >= NetGrade::DEGRADED);
+    sendRow("Grade", gradeStr, gradeBad);
     sendRow("Internet", netHealthIsUp ? "ONLINE" : "OFFLINE", !netHealthIsUp);
 
-    if (nhStats.avgLatencyMs > 0) {
+    if (nhStats.avgLatencyMs > 0)
+    {
         sendRow("Avg Latency", String(nhStats.avgLatencyMs) + " ms", nhStats.avgLatencyMs > 200);
         sendRow("Min Latency", String(nhStats.minLatencyMs) + " ms");
         sendRow("Max Latency", String(nhStats.maxLatencyMs) + " ms", nhStats.maxLatencyMs > 400);
-        sendRow("Jitter",      String(nhStats.jitterMs)     + " ms", nhStats.jitterMs > 50);
-    } else {
+        sendRow("Jitter", String(nhStats.jitterMs) + " ms", nhStats.jitterMs > 50);
+    }
+    else
+    {
         sendRow("Avg Latency", "---");
     }
 
     sendRow("Packet Loss", String(nhStats.lossPercent) + "%", nhStats.lossPercent > 10);
     sendRow("DNS Lookup",
-            (_lastDnsLatency == 9999 ? "FAILED" :
-            (_lastDnsLatency > 0     ? String(_lastDnsLatency) + " ms" : "---")),
+            (_lastDnsLatency == 9999 ? "FAILED" : (_lastDnsLatency > 0 ? String(_lastDnsLatency) + " ms" : "---")),
             _lastDnsLatency > 500 || _lastDnsLatency == 9999);
     sendRow("Fail Count", String(netHealthConsecutiveFails), netHealthConsecutiveFails > 0);
     _server->sendContent(F("</div>"));
@@ -292,28 +355,31 @@ static void handleRoot() {
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// WIFI SECURITY</span>"));
     String secType = getSecurityType();
-    bool   weakSec = (secType.indexOf("OPEN") >= 0 || secType.indexOf("WEP") >= 0);
+    bool weakSec = (secType.indexOf("OPEN") >= 0 || secType.indexOf("WEP") >= 0);
     sendRow("Auth Mode", secType, weakSec);
-    sendRow("Cipher",    getCipherType());
-    if (weakSec) {
+    sendRow("Cipher", getCipherType());
+    if (weakSec)
+    {
         _server->sendContent(F("<div class='alert-box'>&#9888; WEAK SECURITY — UPGRADE RECOMMENDED</div>"));
     }
     _server->sendContent(F("</div>"));
 
-    if (_nearbyCount > 0) {
+    if (_nearbyCount > 0)
+    {
         _server->sendContent(F("<div class='sec'>"));
         _server->sendContent(F("<span class='sec-h'>// NEARBY NETWORKS</span>"));
         _server->sendContent(F("<table><tr><th>SSID</th><th>RSSI</th><th>CH</th><th>SEC</th></tr>"));
-        for (int i = 0; i < _nearbyCount; i++) {
-            String rssiCss = (_nearbyAPs[i].rssi > -60) ? "ok" :
-                             (_nearbyAPs[i].rssi > -75) ? "med" : "warn";
+        for (int i = 0; i < _nearbyCount; i++)
+        {
+            String rssiCss = (_nearbyAPs[i].rssi > -60) ? "ok" : (_nearbyAPs[i].rssi > -75) ? "med"
+                                                                                            : "warn";
             _server->sendContent("<tr><td>" + _nearbyAPs[i].ssid +
-                "<br><span class='mac'>" + _nearbyAPs[i].bssid + "</span></td>");
+                                 "<br><span class='mac'>" + _nearbyAPs[i].bssid + "</span></td>");
             _server->sendContent("<td class='" + rssiCss + "'>" + String(_nearbyAPs[i].rssi) + "</td>");
             _server->sendContent("<td>" + String(_nearbyAPs[i].channel) + "</td>");
             _server->sendContent(String("<td>") +
-                (_nearbyAPs[i].isOpen ? "<span class='warn'>OPEN</span>" : "ENC") +
-                "</td></tr>");
+                                 (_nearbyAPs[i].isOpen ? "<span class='warn'>OPEN</span>" : "ENC") +
+                                 "</td></tr>");
         }
         _server->sendContent(F("</table>"));
         _server->sendContent(F("</div>"));
@@ -321,27 +387,29 @@ static void handleRoot() {
 
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// IP CONFIG</span>"));
-    sendRow("Local IP",  wifiIP());
-    sendRow("Gateway",   wifiGatewayIP());
-    sendRow("DNS",       wifiDNSIP());
-    sendRow("Subnet",    wifiSubnetMask());
-    sendRow("MAC",       wifiMACAddress());
-    sendRow("Hostname",  wifiHostname());
+    sendRow("Local IP", wifiIP());
+    sendRow("Gateway", wifiGatewayIP());
+    sendRow("DNS", wifiDNSIP());
+    sendRow("Subnet", wifiSubnetMask());
+    sendRow("MAC", wifiMACAddress());
+    sendRow("Hostname", wifiHostname());
     _server->sendContent(F("</div>"));
 
-    if (_connHistoryCount > 0) {
+    if (_connHistoryCount > 0)
+    {
         _server->sendContent(F("<div class='sec'>"));
         _server->sendContent(F("<span class='sec-h'>// CONNECTION HISTORY</span>"));
         _server->sendContent(F("<table><tr><th>TIME</th><th>EVENT</th><th>RSSI</th></tr>"));
-        for (int i = _connHistoryCount - 1; i >= max(0, _connHistoryCount - 8); i--) {
+        for (int i = _connHistoryCount - 1; i >= max(0, _connHistoryCount - 8); i--)
+        {
             uint32_t t = _connHistory[i].timestamp;
-            String   timeStr = String(t / 3600) + "h " +
-                               String((t % 3600) / 60) + "m " +
-                               String(t % 60) + "s";
-            String   evCss = _connHistory[i].connected ? "ok" : "warn";
+            String timeStr = String(t / 3600) + "h " +
+                             String((t % 3600) / 60) + "m " +
+                             String(t % 60) + "s";
+            String evCss = _connHistory[i].connected ? "ok" : "warn";
             _server->sendContent("<tr class='" + evCss + "'><td>" + timeStr + "</td>");
             _server->sendContent(String("<td>") +
-                (_connHistory[i].connected ? "CONNECT" : "DROP") + "</td>");
+                                 (_connHistory[i].connected ? "CONNECT" : "DROP") + "</td>");
             _server->sendContent("<td>" + String(_connHistory[i].rssi) + "</td></tr>");
         }
         _server->sendContent(F("</table>"));
@@ -350,14 +418,14 @@ static void handleRoot() {
 
     _server->sendContent(F("<div class='sec'>"));
     _server->sendContent(F("<span class='sec-h'>// HARDWARE</span>"));
-    sendRow("Free Heap",   String(ESP.getFreeHeap()    / 1024) + " KB");
-    sendRow("Min Heap",    String(ESP.getMinFreeHeap() / 1024) + " KB");
-    sendRow("Chip Model",  String(ESP.getChipModel()));
-    sendRow("CPU Freq",    String(ESP.getCpuFreqMHz())  + " MHz");
-    sendRow("Flash Size",  String(ESP.getFlashChipSize() / 1024) + " KB");
-    sendRow("TX Power",    String(wifiTxPower(), 1) + " dBm");
+    sendRow("Free Heap", String(ESP.getFreeHeap() / 1024) + " KB");
+    sendRow("Min Heap", String(ESP.getMinFreeHeap() / 1024) + " KB");
+    sendRow("Chip Model", String(ESP.getChipModel()));
+    sendRow("CPU Freq", String(ESP.getCpuFreqMHz()) + " MHz");
+    sendRow("Flash Size", String(ESP.getFlashChipSize() / 1024) + " KB");
+    sendRow("TX Power", String(wifiTxPower(), 1) + " dBm");
     sendRow("SDK Version", String(ESP.getSdkVersion()));
-    sendRow("Uptime",      wifiUptimeFormatted());
+    sendRow("Uptime", wifiUptimeFormatted());
     _server->sendContent(F("</div>"));
 
     _server->sendContent(F("<div class='footer'>CLUNCHI TACTICAL DASHBOARD v2.0</div>"));
@@ -368,56 +436,68 @@ static void handleRoot() {
     resumeBackground();
 }
 
-static void handleAPI() {
+static void handleAPI()
+{
     String json = "{";
-    json += "\"rssi\":"          + String(wifiRSSI())                      + ",";
-    json += "\"signal_pct\":"    + String(wifiSignalPercent())             + ",";
-    json += "\"signal_bars\":"   + String(rssiBars(wifiRSSI()))            + ",";
-    json += "\"ssid\":\""        + wifiCurrentSSID()                       + "\",";
-    json += "\"ip\":\""          + wifiIP()                                + "\",";
-    json += "\"gateway\":\""     + wifiGatewayIP()                         + "\",";
-    json += "\"online\":"        + String(netHealthIsUp ? "true" : "false") + ",";
-    json += "\"grade\":\""       + String(netGradeLabel(nhStats.grade))    + "\",";
-    json += "\"avg_latency\":"   + String(nhStats.avgLatencyMs)            + ",";
-    json += "\"min_latency\":"   + String(nhStats.minLatencyMs)            + ",";
-    json += "\"max_latency\":"   + String(nhStats.maxLatencyMs)            + ",";
-    json += "\"jitter\":"        + String(nhStats.jitterMs)                + ",";
-    json += "\"loss_pct\":"      + String(nhStats.lossPercent)             + ",";
-    json += "\"dns_latency\":"   + String(_lastDnsLatency)                 + ",";
-    json += "\"wids_count\":"    + String(widsTotalCount)                  + ","; 
-    json += "\"deauth_count\":"  + String(widsTotalCount)                  + ","; 
-    json += "\"threat_score\":"  + String(widsThreatScore())               + ",";
-    json += "\"under_attack\":"  + String(widsUnderAttack() ? "true" : "false") + ",";
-    json += "\"uptime\":"        + String(wifiConnUptime())                + ",";
-    json += "\"heap\":"          + String(ESP.getFreeHeap())               + ",";
-    json += "\"security\":\""    + getSecurityType()                       + "\"";
+    json += "\"rssi\":" + String(wifiRSSI()) + ",";
+    json += "\"signal_pct\":" + String(wifiSignalPercent()) + ",";
+    json += "\"signal_bars\":" + String(rssiBars(wifiRSSI())) + ",";
+    json += "\"ssid\":\"" + wifiCurrentSSID() + "\",";
+    json += "\"ip\":\"" + wifiIP() + "\",";
+    json += "\"gateway\":\"" + wifiGatewayIP() + "\",";
+    json += "\"online\":" + String(netHealthIsUp ? "true" : "false") + ",";
+    json += "\"grade\":\"" + String(netGradeLabel(nhStats.grade)) + "\",";
+    json += "\"avg_latency\":" + String(nhStats.avgLatencyMs) + ",";
+    json += "\"min_latency\":" + String(nhStats.minLatencyMs) + ",";
+    json += "\"max_latency\":" + String(nhStats.maxLatencyMs) + ",";
+    json += "\"jitter\":" + String(nhStats.jitterMs) + ",";
+    json += "\"loss_pct\":" + String(nhStats.lossPercent) + ",";
+    json += "\"dns_latency\":" + String(_lastDnsLatency) + ",";
+    json += "\"wids_count\":" + String(widsTotalCount) + ",";
+    json += "\"deauth_count\":" + String(widsTotalCount) + ",";
+    json += "\"threat_score\":" + String(widsThreatScore()) + ",";
+    json += "\"under_attack\":" + String(widsUnderAttack() ? "true" : "false") + ",";
+    json += "\"uptime\":" + String(wifiConnUptime()) + ",";
+    json += "\"heap\":" + String(ESP.getFreeHeap()) + ",";
+    json += "\"security\":\"" + getSecurityType() + "\"";
     json += "}";
 
     _server->sendHeader("Access-Control-Allow-Origin", "*");
     _server->send(200, "application/json", json);
 }
 
-void dashboardBegin() {
-    if (_active) return;
+void dashboardBegin()
+{
+    if (_active)
+        return;
     _server = new WebServer(80);
-    _server->on("/",    HTTP_GET, handleRoot);
+    _server->on("/", HTTP_GET, handleRoot);
     _server->on("/api", HTTP_GET, handleAPI);
     _server->begin();
-    _active       = true;
+    _active = true;
     _wasConnected = wifiConnected();
     _lastNearbyScan = 0;
-    _nearbyCount    = 0;
+    _nearbyCount = 0;
     WiFi.scanNetworks(true, false, true);
 }
 
-void dashboardEnd() {
-    if (!_active) return;
-    if (_server) { _server->stop(); delete _server; _server = nullptr; }
+void dashboardEnd()
+{
+    if (!_active)
+        return;
+    if (_server)
+    {
+        _server->stop();
+        delete _server;
+        _server = nullptr;
+    }
     _active = false;
 }
 
-void dashboardUpdate() {
-    if (_active && _server) {
+void dashboardUpdate()
+{
+    if (_active && _server)
+    {
         _server->handleClient();
         trackConnection();
         updateNearbyScan();
