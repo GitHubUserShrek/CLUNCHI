@@ -45,7 +45,7 @@ To change networks later, clear the saved credentials and use the setup portal a
 ### Threat Detection
 - Deauth/disassoc frame detection
 - Evil Twin Detection
-- Beacon Flood detedtion
+- Beacon Flood detection
 - Threat scoring
 - Recent event log
 - Targeted attack indication
