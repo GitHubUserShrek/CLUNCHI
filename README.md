@@ -44,6 +44,8 @@ To change networks later, clear the saved credentials and use the setup portal a
 
 ### Threat Detection
 - Deauth/disassoc frame detection
+- Evil Twin Detection
+- Beacon Flood detedtion
 - Threat scoring
 - Recent event log
 - Targeted attack indication
@@ -67,7 +69,7 @@ Once CLUNCHI is connected to Wi-Fi, open its local IP address in a browser to ac
 - L2 security info
 - L3 connectivity stats (internet / DNS / latency)
 - Signal quality
-- Deauth/disassoc alert information
+- Threat alert information
 - Nearby networks with channel info
 - Hardware stats
 - Local JSON API endpoint (possible ESPHome port in the future)
