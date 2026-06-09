@@ -171,6 +171,8 @@ static void _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
     wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t *)buf;
     uint8_t *payload = pkt->payload;
     uint16_t len = pkt->rx_ctrl.sig_len;
+
+
     int rssi = pkt->rx_ctrl.rssi;
     uint32_t now = millis();
 
@@ -255,23 +257,22 @@ static void _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
 
     if (frameType == 1 && frameSubtype == 12)
     {
-        uint16_t duration = payload[1] | (payload[2] << 8);
-        if (duration > 30000)
+        if (len < 10) return;   // real CTS minimum
+
+        // Flood detection by VOLUME, not duration value.
+        _ctsJamCount++;
+
+        if (now - _lastCtsFloodCheck >= 1000)
         {
-            if (now - _lastCtsFloodCheck > 1000)
+            if (_ctsJamCount > 300)   // CTS/sec threshold — tune from field testing
             {
-                if (_ctsJamCount > 20)
-                {
-                    uint8_t *targetMac = &payload[4];
-                    logThreatEvent(ATTACK_CTS_JAMMING, (uint8_t *)BROADCAST_MAC, targetMac, targetMac, duration, rssi, "NAV_Jamming");
-                }
-                _ctsJamCount = 0;
-                _lastCtsFloodCheck = now;
+                uint16_t duration = payload[1] | (payload[2] << 8);
+                uint8_t *targetMac = &payload[4];
+                logThreatEvent(ATTACK_CTS_JAMMING, (uint8_t *)BROADCAST_MAC,
+                               targetMac, targetMac, duration, rssi, "NAV_Jamming");
             }
-            else
-            {
-                _ctsJamCount++;
-            }
+            _ctsJamCount = 0;
+            _lastCtsFloodCheck = now;
         }
         return;
     }
@@ -336,6 +337,12 @@ void widsBegin()
 
     wifi_promiscuous_filter_t filter = {.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_CTRL | WIFI_PROMIS_FILTER_MASK_DATA};
     esp_wifi_set_promiscuous_filter(&filter);
+    esp_wifi_set_promiscuous_rx_cb(_widsSniffer);
+    esp_wifi_set_promiscuous(true);
+
+    wifi_promiscuous_filter_t ctrlFilter = {.filter_mask = WIFI_PROMIS_CTRL_FILTER_MASK_ALL};
+    esp_wifi_set_promiscuous_ctrl_filter(&ctrlFilter);
+
     esp_wifi_set_promiscuous_rx_cb(_widsSniffer);
     esp_wifi_set_promiscuous(true);
 
