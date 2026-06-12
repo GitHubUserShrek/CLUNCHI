@@ -23,7 +23,7 @@ Wi-Fi credentials are **not** hardcoded into the firmware and are **not** meant 
 
 On first boot, or when no credentials are saved:
 - Open the menu (double tap), go to WiFi, select Setup Portal
-- Connect to the CLUNCHI access point from your phone or computer (pw: `clunchi123`)
+- Connect to the CLUNCHI_Setup access point from your phone or computer (pw: `clunchi123`)
 - Open the portal page
 - Enter your Wi-Fi SSID and password
 - Save the configuration
