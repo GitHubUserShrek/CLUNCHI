@@ -1,6 +1,6 @@
 # CLUNCHI BETA v1.0
 
-> ⚠️ **IMPORTANT:** Versions moving forward will require soldering the jumper **"A"** on the TTP223 module before assembly.
+> ⚠️ **IMPORTANT:** Versions 1.1 and above will require soldering the jumper **"A"** on the TTP223 module before assembly.
 
 CLUNCHI is an ESP32-based network companion with a personality.
 
