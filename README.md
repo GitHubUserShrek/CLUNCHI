@@ -10,7 +10,8 @@ Built on an ESP32-C3 SuperMini with a 1.3" SH1106 OLED, capacitive touch, a tiny
 - https://www.printables.com/model/1702860-clunchi-v1
 - https://makerworld.com/en/models/2774193-clunchi-v1
 
-*Build guide coming soon.*
+BUILD GUIDE:
+https://www.instructables.com/CLUNCHI-V1/
 
 This project is currently in **beta** with active development on the firmware, dashboard, and future hardware ports.
 
