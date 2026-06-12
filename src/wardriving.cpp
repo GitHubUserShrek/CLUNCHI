@@ -5,59 +5,68 @@
 #include <WiFi.h>
 #include <SD.h>
 
-#define WD_SCAN_INTERVAL_MS   3000
-#define WD_MAX_NETWORKS       60
+#define WD_SCAN_INTERVAL_MS 3000
+#define WD_MAX_NETWORKS 60
 
-bool     wardrivingActive         = false;
+bool wardrivingActive = false;
 uint32_t wardrivingNetworksLogged = 0;
 static String _sessionTimestamp = "";
 static uint32_t _sessionPart = 0;
 
-static uint32_t _lastScanTime  = 0;
-static bool     _scanRequested = false;
-static bool     _scanning      = false;
+static uint32_t _lastScanTime = 0;
+static bool _scanRequested = false;
+static bool _scanning = false;
 
 #define WD_SEEN_CAPACITY 2048
-#define WD_SEEN_EMPTY    0
-#define WD_SEEN_USED     1
+#define WD_SEEN_EMPTY 0
+#define WD_SEEN_USED 1
 
-struct SeenEntry {
-    uint8_t  state;
+struct SeenEntry
+{
+    uint8_t state;
     uint32_t hash;
-    String   bssid;
+    String bssid;
 };
 
-static SeenEntry* _seenTable = nullptr;
+static SeenEntry *_seenTable = nullptr;
 static int _seenCount = 0;
 
-static uint32_t fnvHash(const String& s) {
+static uint32_t fnvHash(const String &s)
+{
     uint32_t h = 2166136261u;
-    for (int i = 0; i < (int)s.length(); i++) {
+    for (int i = 0; i < (int)s.length(); i++)
+    {
         h ^= (uint8_t)s[i];
         h *= 16777619u;
     }
     return h;
 }
 
-static void clearSeen() {
-    if (!_seenTable) {
+static void clearSeen()
+{
+    if (!_seenTable)
+    {
         _seenCount = 0;
         return;
     }
 
-    for (int i = 0; i < WD_SEEN_CAPACITY; i++) {
+    for (int i = 0; i < WD_SEEN_CAPACITY; i++)
+    {
         _seenTable[i].state = WD_SEEN_EMPTY;
-        _seenTable[i].hash  = 0;
+        _seenTable[i].hash = 0;
         _seenTable[i].bssid = "";
     }
     _seenCount = 0;
 }
 
-static bool allocSeen() {
-    if (_seenTable) return true;
+static bool allocSeen()
+{
+    if (_seenTable)
+        return true;
 
     _seenTable = new SeenEntry[WD_SEEN_CAPACITY];
-    if (!_seenTable) {
+    if (!_seenTable)
+    {
         Serial.println("[Wardriving] Warning — failed to allocate dedup table. Continuing without dedup.");
         _seenCount = 0;
         return false;
@@ -68,8 +77,10 @@ static bool allocSeen() {
     return true;
 }
 
-static void freeSeen() {
-    if (!_seenTable) {
+static void freeSeen()
+{
+    if (!_seenTable)
+    {
         _seenCount = 0;
         return;
     }
@@ -80,44 +91,59 @@ static void freeSeen() {
     Serial.println("[Wardriving] Dedup table freed");
 }
 
-static bool alreadySeen(const String& bssid) {
-    if (!_seenTable) return false;
-    if (_seenCount >= WD_SEEN_CAPACITY) return false;
+static bool alreadySeen(const String &bssid)
+{
+    if (!_seenTable)
+        return false;
+    if (_seenCount >= WD_SEEN_CAPACITY)
+        return false;
 
     uint32_t h = fnvHash(bssid);
     uint32_t idx = h % WD_SEEN_CAPACITY;
 
-    for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++) {
+    for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++)
+    {
         uint32_t i = (idx + probe) % WD_SEEN_CAPACITY;
-        if (_seenTable[i].state == WD_SEEN_EMPTY) return false;
-        if (_seenTable[i].hash == h && _seenTable[i].bssid == bssid) return true;
+        if (_seenTable[i].state == WD_SEEN_EMPTY)
+            return false;
+        if (_seenTable[i].hash == h && _seenTable[i].bssid == bssid)
+            return true;
     }
     return false;
 }
 
-static void markSeen(const String& bssid) {
-    if (!_seenTable) return;
-    if (_seenCount >= WD_SEEN_CAPACITY - 1) return;
+static void markSeen(const String &bssid)
+{
+    if (!_seenTable)
+        return;
+    if (_seenCount >= WD_SEEN_CAPACITY - 1)
+        return;
 
     uint32_t h = fnvHash(bssid);
     uint32_t idx = h % WD_SEEN_CAPACITY;
 
-    for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++) {
+    for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++)
+    {
         uint32_t i = (idx + probe) % WD_SEEN_CAPACITY;
-        if (_seenTable[i].state == WD_SEEN_EMPTY) {
+        if (_seenTable[i].state == WD_SEEN_EMPTY)
+        {
             _seenTable[i].state = WD_SEEN_USED;
-            _seenTable[i].hash  = h;
+            _seenTable[i].hash = h;
             _seenTable[i].bssid = bssid;
             _seenCount++;
             return;
         }
-        if (_seenTable[i].hash == h && _seenTable[i].bssid == bssid) return;
+        if (_seenTable[i].hash == h && _seenTable[i].bssid == bssid)
+            return;
     }
 }
 
-static void checkAndRotateSession() {
-    if (!_seenTable) return;
-    if (_seenCount < WD_SEEN_CAPACITY - 100) return;
+static void checkAndRotateSession()
+{
+    if (!_seenTable)
+        return;
+    if (_seenCount < WD_SEEN_CAPACITY - 100)
+        return;
 
     _sessionPart++;
     clearSeen();
@@ -130,15 +156,18 @@ static void checkAndRotateSession() {
     Serial.println("[Wardriving] ──────────────────────────────────────");
 }
 
-static String getDateString() {
+static String getDateString()
+{
     LocalTime lt = gpsGetLocalTime();
-    if (lt.valid) {
+    if (lt.valid)
+    {
         char buf[16];
         snprintf(buf, sizeof(buf), "%04d%02d%02d",
                  lt.year, lt.month, lt.day);
         return String(buf);
     }
-    if (gpsData.year > 0) {
+    if (gpsData.year > 0)
+    {
         char buf[16];
         snprintf(buf, sizeof(buf), "%04d%02d%02d",
                  gpsData.year, gpsData.month, gpsData.day);
@@ -147,30 +176,40 @@ static String getDateString() {
     return "NODATE";
 }
 
-static String getTimeString() {
+static String getTimeString()
+{
     LocalTime lt = gpsGetLocalTime();
     char buf[16];
-    if (lt.valid) {
+    if (lt.valid)
+    {
         snprintf(buf, sizeof(buf), "%02d:%02d:%02d",
                  lt.hour, lt.minute, lt.second);
-    } else {
+    }
+    else
+    {
         snprintf(buf, sizeof(buf), "%02d:%02d:%02d",
                  gpsData.hour, gpsData.minute, gpsData.second);
     }
     return String(buf);
 }
 
-static File openNetworkLog() {
-    if (!sdActive) return File();
+static File openNetworkLog()
+{
+    if (!sdActive)
+        return File();
 
-    if (!SD.exists("/wardriving")) {
+    if (!SD.exists("/wardriving"))
+    {
         SD.mkdir("/wardriving");
     }
 
     String path;
-    if (_sessionPart == 0) {
+    if (_sessionPart == 0)
+    {
         path = "/wardriving/WD_" + _sessionTimestamp + ".csv";
-    } else {
+    }
+    else
+    {
         char partBuf[8];
         snprintf(partBuf, sizeof(partBuf), "_P%lu", (unsigned long)_sessionPart);
         path = "/wardriving/WD_" + _sessionTimestamp + String(partBuf) + ".csv";
@@ -179,7 +218,8 @@ static File openNetworkLog() {
     bool isNew = !SD.exists(path.c_str());
     File f = SD.open(path.c_str(), FILE_APPEND);
 
-    if (f && isNew) {
+    if (f && isNew)
+    {
         f.println("time,lat,lon,alt,speed,sats,hdop,ssid,bssid,rssi,channel,encryption");
         Serial.printf("[Wardriving] Created new log: %s\n", path.c_str());
     }
@@ -187,9 +227,11 @@ static File openNetworkLog() {
     return f;
 }
 
-static void logScanResults() {
+static void logScanResults()
+{
     int n = WiFi.scanComplete();
-    if (n <= 0) return;
+    if (n <= 0)
+        return;
 
     checkAndRotateSession();
 
@@ -199,26 +241,47 @@ static void logScanResults() {
     int logged = 0;
     int limit = min(n, WD_MAX_NETWORKS);
 
-    for (int i = 0; i < limit; i++) {
+    for (int i = 0; i < limit; i++)
+    {
         String bssid = WiFi.BSSIDstr(i);
 
-        if (alreadySeen(bssid)) continue;
+        if (alreadySeen(bssid))
+            continue;
 
-        String ssid  = WiFi.SSID(i);
+        String ssid = WiFi.SSID(i);
         int32_t rssi = WiFi.RSSI(i);
-        uint8_t ch   = WiFi.channel(i);
+        uint8_t ch = WiFi.channel(i);
         String enc;
 
-        switch (WiFi.encryptionType(i)) {
-            case WIFI_AUTH_OPEN:            enc = "OPEN"; break;
-            case WIFI_AUTH_WEP:             enc = "WEP"; break;
-            case WIFI_AUTH_WPA_PSK:         enc = "WPA"; break;
-            case WIFI_AUTH_WPA2_PSK:        enc = "WPA2"; break;
-            case WIFI_AUTH_WPA_WPA2_PSK:    enc = "WPA/WPA2"; break;
-            case WIFI_AUTH_WPA3_PSK:        enc = "WPA3"; break;
-            case WIFI_AUTH_WPA2_WPA3_PSK:   enc = "WPA2/WPA3"; break;
-            case WIFI_AUTH_WPA2_ENTERPRISE: enc = "WPA2-ENT"; break;
-            default:                        enc = "OTHER"; break;
+        switch (WiFi.encryptionType(i))
+        {
+        case WIFI_AUTH_OPEN:
+            enc = "OPEN";
+            break;
+        case WIFI_AUTH_WEP:
+            enc = "WEP";
+            break;
+        case WIFI_AUTH_WPA_PSK:
+            enc = "WPA";
+            break;
+        case WIFI_AUTH_WPA2_PSK:
+            enc = "WPA2";
+            break;
+        case WIFI_AUTH_WPA_WPA2_PSK:
+            enc = "WPA/WPA2";
+            break;
+        case WIFI_AUTH_WPA3_PSK:
+            enc = "WPA3";
+            break;
+        case WIFI_AUTH_WPA2_WPA3_PSK:
+            enc = "WPA2/WPA3";
+            break;
+        case WIFI_AUTH_WPA2_ENTERPRISE:
+            enc = "WPA2-ENT";
+            break;
+        default:
+            enc = "OTHER";
+            break;
         }
 
         ssid.replace(",", " ");
@@ -239,7 +302,8 @@ static void logScanResults() {
                  (int)ch,
                  enc.c_str());
 
-        if (hasFile) {
+        if (hasFile)
+        {
             f.println(line);
         }
 
@@ -250,14 +314,16 @@ static void logScanResults() {
         wardrivingNetworksLogged++;
     }
 
-    if (hasFile) {
+    if (hasFile)
+    {
         f.close();
     }
 
     WiFi.scanDelete();
     _scanning = false;
 
-    if (logged > 0) {
+    if (logged > 0)
+    {
         Serial.printf("[Wardriving] Logged %d new networks (total: %lu, seen: %d/%d, part: %lu)%s\n",
                       logged, (unsigned long)wardrivingNetworksLogged,
                       _seenCount, WD_SEEN_CAPACITY,
@@ -266,41 +332,50 @@ static void logScanResults() {
     }
 }
 
-static void startScan() {
-    if (_scanning) return;
+static void startScan()
+{
+    if (_scanning)
+        return;
     WiFi.scanNetworks(true, false, true);
     _scanning = true;
     _lastScanTime = millis();
 }
 
-void wardrivingBegin() {
-    if (wardrivingActive) return;
+void wardrivingBegin()
+{
+    if (wardrivingActive)
+        return;
 
-    if (!gpsActive) {
+    if (!gpsActive)
+    {
         Serial.println("[Wardriving] Warning — GPS not active.");
     }
 
-    if (!sdActive) {
+    if (!sdActive)
+    {
         Serial.println("[Wardriving] Warning — SD card not mounted. Logging to serial only.");
     }
 
     allocSeen();
 
-    wardrivingActive         = true;
+    wardrivingActive = true;
     wardrivingNetworksLogged = 0;
-    _lastScanTime            = 0;
-    _scanRequested           = false;
-    _scanning                = false;
-    _sessionPart             = 0;
+    _lastScanTime = 0;
+    _scanRequested = false;
+    _scanning = false;
+    _sessionPart = 0;
     clearSeen();
 
     LocalTime lt = gpsGetLocalTime();
     char ts[32];
-    if (lt.valid) {
+    if (lt.valid)
+    {
         snprintf(ts, sizeof(ts), "%04d%02d%02d_%02d%02d%02d",
                  lt.year, lt.month, lt.day,
                  lt.hour, lt.minute, lt.second);
-    } else {
+    }
+    else
+    {
         snprintf(ts, sizeof(ts), "%04d%02d%02d_%02d%02d%02d",
                  gpsData.year, gpsData.month, gpsData.day,
                  gpsData.hour, gpsData.minute, gpsData.second);
@@ -319,8 +394,10 @@ void wardrivingBegin() {
     startScan();
 }
 
-void wardrivingEnd() {
-    if (!wardrivingActive) return;
+void wardrivingEnd()
+{
+    if (!wardrivingActive)
+        return;
     wardrivingActive = false;
 
     WiFi.scanDelete();
@@ -338,42 +415,54 @@ void wardrivingEnd() {
     freeSeen();
 }
 
-void wardrivingForceScan() {
-    if (!wardrivingActive) return;
+void wardrivingForceScan()
+{
+    if (!wardrivingActive)
+        return;
     _scanRequested = true;
     Serial.println("[Wardriving] Manual scan requested!");
 }
 
-void wardrivingUpdate() {
-    if (!wardrivingActive) return;
+void wardrivingUpdate()
+{
+    if (!wardrivingActive)
+        return;
 
     uint32_t now = millis();
 
-    if (_scanning) {
+    if (_scanning)
+    {
         int result = WiFi.scanComplete();
-        if (result >= 0) {
+        if (result >= 0)
+        {
             logScanResults();
-        } else if (result == WIFI_SCAN_FAILED) {
+        }
+        else if (result == WIFI_SCAN_FAILED)
+        {
             _scanning = false;
             Serial.println("[Wardriving] Scan failed.");
         }
     }
 
-    if (!_scanning && (now - _lastScanTime >= WD_SCAN_INTERVAL_MS)) {
+    if (!_scanning && (now - _lastScanTime >= WD_SCAN_INTERVAL_MS))
+    {
         startScan();
     }
 
-    if (!_scanning && _scanRequested) {
+    if (!_scanning && _scanRequested)
+    {
         _scanRequested = false;
         startScan();
     }
 }
 
-bool isWardrivingActive() {
+bool isWardrivingActive()
+{
     return wardrivingActive;
 }
 
-void wardrivingPrintStatus() {
+void wardrivingPrintStatus()
+{
     Serial.println();
     Serial.println("[Wardriving] ==========================================");
     Serial.printf("[Wardriving]  Active:      %s\n", wardrivingActive ? "YES" : "NO");

@@ -1,7 +1,8 @@
 #pragma once
 #include <Arduino.h>
 
-enum MenuMode {
+enum MenuMode
+{
     MENU_OFF,
     MENU_MAIN,
     MENU_WIFI,
@@ -19,6 +20,10 @@ enum MenuMode {
     MENU_VOLUME,
     MENU_SLEEP_TIMER,
     MENU_TIMEZONE,
+    MENU_GAMES,
+    MENU_DICE,
+    MENU_MAGIC_8BALL,
+    MENU_BLACKJACK,
     MENU_CONFIRM
 };
 
@@ -27,5 +32,5 @@ void menuUpdate();
 void enterMenu();
 void exitMenu();
 bool isMenuActive();
-void showConfirm(const char* line1, const char* line2,
+void showConfirm(const char *line1, const char *line2,
                  MenuMode returnTo);

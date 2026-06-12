@@ -1,42 +1,42 @@
 #pragma once
 #include <Arduino.h>
 
-struct BLEResult {
+struct BLEResult
+{
     String address;
     String name;
-    int    rssi;
-    bool   isKnown;
+    int rssi;
     String manufacturer;
     String deviceType;
-    bool   isAlert;
+    bool isAlert;
+    bool isMeshtastic;
+    bool isNewMeshtastic;
     String alertLabel;
-    String signal;
-    bool   isPublicAddr;
+    bool isPublicAddr;
+    bool isKnown;
 };
 
 extern BLEResult bleResults[40];
-extern int       bleCount;
-extern bool      bleScanActive;
-
+extern int bleCount;
+extern bool bleScanActive;
 extern uint32_t bleAlertsLoggedTotal;
 
-void bleGetSortedIndices(int* idx, int count);
-
-void     bleBegin();
-void     bleDeinit();
-void     bleUpdate();
-bool     isBleInitialised();
-
-void     bleStartScan();
-void     bleStopScan();
-void     bleCancelScan();
+void bleBegin();
+void bleDeinit();
+bool isBleInitialised();
+void bleStartScan();
+void bleStopScan();
+void bleCancelScan();
 uint32_t bleScanStartTime();
 
-int      bleAlertCount();
-bool     bleHasAlerts();
-void     blePrintInfo();
-void     blePrintAlerts();
+void bleStartRadar();
+void bleStopRadar();
+void bleForceSweep();
+void bleUpdate();
 
-void     bleStartRadar();
-void     bleStopRadar();
-void     bleForceSweep();
+int bleAlertCount();
+bool bleHasAlerts();
+
+void bleGetSortedIndices(int *idx, int count);
+void blePrintInfo();
+void blePrintAlerts();

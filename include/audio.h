@@ -2,7 +2,8 @@
 #include <Arduino.h>
 #include "config.h"
 
-class Audio {
+class Audio
+{
 public:
     void begin();
     void stop();
@@ -15,28 +16,28 @@ public:
 
     void beep(int freq, uint32_t duration);
 
-    void chirp();          
+    void chirp();
 
-    void happy();           
-    void sleepy();          
-    void annoyed();         
-    void curious();         
-    void jazzed();          
-    void enraged();       
-    void dead();            
-    void dribble();         
+    void happy();
+    void sleepy();
+    void annoyed();
+    void curious();
+    void jazzed();
+    void enraged();
+    void dead();
+    void dribble();
 
-    void spiralEyes();      
-    void heartEyes();       
+    void spiralEyes();
+    void heartEyes();
 
-    void radarOn();         
-    void radarOff();        
-    void radarPing();       
-    void radarAlert();      
+    void radarOn();
+    void radarOff();
+    void radarPing();
+    void radarAlert();
 
 private:
     uint8_t volume_ = DEFAULT_VOLUME;
-    uint8_t savedVolume_ = DEFAULT_VOLUME;  
-    bool    muted_ = false;                 
+    uint8_t savedVolume_ = DEFAULT_VOLUME;
+    bool muted_ = false;
     void tone(int freq);
 };

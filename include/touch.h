@@ -2,7 +2,8 @@
 #include <Arduino.h>
 #include "config.h"
 
-enum class TouchEvent : uint8_t {
+enum class TouchEvent : uint8_t
+{
     NONE,
     TAP_1,
     TAP_2,
@@ -16,21 +17,23 @@ enum class TouchEvent : uint8_t {
     DRIBBLE_END,
 };
 
-extern bool          isTouched;
-extern bool          touchJustPressed;
-extern bool          touchJustReleased;
-extern bool          longTouchActive;
-extern bool          touchWasLongPress;
+extern bool isTouched;
+extern bool touchJustPressed;
+extern bool touchJustReleased;
+extern bool longTouchActive;
+extern bool touchWasLongPress;
 extern unsigned long touchDownTime;
 extern unsigned long touchUpTime;
 
-void       calibrateTouch();
-void       handleTouch();       
-void       evaluateTaps();       
-TouchEvent consumeTouchEvent();  
-void       resetTapCount();
-bool       isDribbleActive();    
+void calibrateTouch();
+void handleTouch();
+void evaluateTaps();
+TouchEvent consumeTouchEvent();
+void resetTapCount();
+bool isDribbleActive();
 
-int  readTouchRaw();
-int  getTouchBaseline();
+void triggerDribbleFromShake();
+
+int readTouchRaw();
+int getTouchBaseline();
 bool readTouch();
