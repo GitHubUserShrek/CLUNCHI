@@ -5,9 +5,14 @@ static bool _nvsLoaded = false;
 
 void Audio::begin()
 {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcAttach(PIN_SPEAKER, 2000, 8);
+#else
     ledcSetup(TONE_CHANNEL, 2000, 8);
     ledcAttachPin(PIN_SPEAKER, TONE_CHANNEL);
+#endif
     stop();
+    
 
     Preferences prefs;
     if (prefs.begin("clunchi", true))
@@ -24,13 +29,22 @@ void Audio::begin()
 
 void Audio::tone(int freq)
 {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcWriteTone(PIN_SPEAKER, freq);
+    ledcWrite(PIN_SPEAKER, volume_);
+#else
     ledcWriteTone(TONE_CHANNEL, freq);
     ledcWrite(TONE_CHANNEL, volume_);
+#endif
 }
 
 void Audio::stop()
 {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcWrite(PIN_SPEAKER, 0);
+#else
     ledcWrite(TONE_CHANNEL, 0);
+#endif
 }
 
 void Audio::beep(int freq, uint32_t duration)
@@ -42,6 +56,7 @@ void Audio::beep(int freq, uint32_t duration)
 
 void Audio::saveSettings()
 {
+    uint32_t t0 = millis();
     Preferences prefs;
     if (prefs.begin("clunchi", false))
     {
@@ -49,7 +64,7 @@ void Audio::saveSettings()
         prefs.putUChar("savedVol", savedVolume_);
         prefs.putBool("muted", muted_);
         prefs.end();
-        Serial.println("[Audio] Settings saved to NVS.");
+        Serial.printf("[Audio] Settings saved to NVS in %lu ms.\n", (unsigned long)(millis() - t0));
     }
 }
 
