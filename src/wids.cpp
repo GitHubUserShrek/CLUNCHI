@@ -172,7 +172,6 @@ static void _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
     uint8_t *payload = pkt->payload;
     uint16_t len = pkt->rx_ctrl.sig_len;
 
-
     int rssi = pkt->rx_ctrl.rssi;
     uint32_t now = millis();
 
@@ -257,14 +256,14 @@ static void _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
 
     if (frameType == 1 && frameSubtype == 12)
     {
-        if (len < 10) return;   // real CTS minimum
+        if (len < 10)
+            return;
 
-        // Flood detection by VOLUME, not duration value.
         _ctsJamCount++;
 
         if (now - _lastCtsFloodCheck >= 1000)
         {
-            if (_ctsJamCount > 300)   // CTS/sec threshold — tune from field testing
+            if (_ctsJamCount > 300)
             {
                 uint16_t duration = payload[1] | (payload[2] << 8);
                 uint8_t *targetMac = &payload[4];
