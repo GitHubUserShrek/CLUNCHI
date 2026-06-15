@@ -327,27 +327,32 @@ void bleBegin()
     Serial.println("[BLE] Radio Ready.");
 }
 
-void bleDeinit()
-{
-    if (!_bleInitialised)
-        return;
+void bleDeinit() {
+    if (!_bleInitialised) return;
+
+#if defined(CONFIG_IDF_TARGET_ESP32C5)
+    if (_pScan && bleScanActive) { _pScan->stop(); delay(50); }
+    bleScanActive = false;
+    _radarMode = false;
+    meshEnd();
+    Serial.println("[BLE] (C5) Scan stopped, stack stays alive.");
+    return;
+#else
     Serial.println("[BLE] Deinitializing Radio...");
-    if (_pScan)
-    {
-        if (bleScanActive)
-        {
-            _pScan->stop();
-            delay(100);
-        }
-        _pScan = nullptr;
+    if (_pScan) {
+        if (bleScanActive) { _pScan->stop(); delay(100); }
+        _pScan->setScanCallbacks(nullptr, false);
+        _pScan->clearResults();
     }
     bleScanActive = false;
     _radarMode = false;
-    NimBLEDevice::deinit(true);
+    meshEnd();
+    _pScan = nullptr;
+    NimBLEDevice::deinit(false);
     _bleInitialised = false;
     bleCount = 0;
-    meshEnd();
     Serial.println("[BLE] Radio Offline.");
+#endif
 }
 
 bool isBleInitialised() { return _bleInitialised; }

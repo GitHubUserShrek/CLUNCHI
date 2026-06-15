@@ -358,9 +358,11 @@ static void act_wardriving()
 
 static void act_ble_scan()
 {
-    wifiDeinit();
+#if !defined(CONFIG_IDF_TARGET_ESP32C5)
+    wifiDeinit();        
     delay(500);
     bleBegin();
+#endif
     delay(100);
     if (isBleInitialised())
     {

@@ -2,8 +2,13 @@
 #include <Arduino.h>
 
 // OLED
-#define PIN_I2C_SDA 20
-#define PIN_I2C_SCL 21
+#if defined(CONFIG_IDF_TARGET_ESP32C5)
+  #define PIN_I2C_SDA 24
+  #define PIN_I2C_SCL 23
+#else
+  #define PIN_I2C_SDA 20
+  #define PIN_I2C_SCL 21
+#endif
 #define I2C_FREQ 400000UL
 #define OLED_ADDR 0x3C
 #define OLED_WIDTH 128

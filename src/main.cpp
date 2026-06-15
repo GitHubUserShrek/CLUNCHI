@@ -77,7 +77,7 @@ void setup()
 {
     Serial.begin(115200);
     delay(900);
-    Serial.println("\n[System] CLUNCHI TACTICAL PET v2.0 Booting...");
+    Serial.println("\n[System] CLUNCHI BETA v1.0 Booting...");
 
     Preferences nvsInit;
     nvsInit.begin("clunchi", false);
@@ -103,6 +103,10 @@ void setup()
     gpsBegin();
     gpsLoadTimeSettings();
     sdBegin();
+    #if defined(CONFIG_IDF_TARGET_ESP32C5)
+    bleBegin();
+    Serial.println("[System] (C5) BLE initialized once for session.");
+#endif
 
     display.drawSplash();
     audio.chirp();
@@ -122,6 +126,7 @@ void setup()
 void loop()
 {
     uint32_t now = millis();
+    
 
     wifiUpdate();
     wifiProcessPortal();
