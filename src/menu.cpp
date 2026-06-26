@@ -275,20 +275,20 @@ static void act_vol_up()
 {
     audio.setVolume(std::min(255, (int)audio.getVolume() + 32));
     audio.beep(440, 20);
-    audio.saveSettings();        
+    audio.saveSettings();
 }
 static void act_vol_down()
 {
     audio.setVolume(std::max(0, (int)audio.getVolume() - 32));
     audio.beep(440, 20);
-    audio.saveSettings();       
+    audio.saveSettings();
 }
 static void act_mute()
 {
     audio.toggleMute();
     if (!audio.isMuted())
         audio.beep(440, 20);
-    audio.saveSettings();        
+    audio.saveSettings();
 }
 
 static void act_wifi_info()
@@ -358,8 +358,8 @@ static void act_wardriving()
 
 static void act_ble_scan()
 {
-#if !defined(CONFIG_IDF_TARGET_ESP32C5)
-    wifiDeinit();        
+#if !BLE_KEEP_STACK_ALIVE
+    wifiDeinit();
     delay(500);
     bleBegin();
 #endif

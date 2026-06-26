@@ -101,10 +101,12 @@ void wifiBegin()
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_8_5dBm);
     WiFi.setSleep(false);
-#if !defined(CONFIG_IDF_TARGET_ESP32C5)
+
+#if WIFI_SET_LEGACY_PROTOCOL
     esp_wifi_set_protocol(WIFI_IF_STA,
                           WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
 #endif
+
     _wifiInitialised = true;
     Serial.println("[WiFi] Radio initialized.");
 }
@@ -114,9 +116,8 @@ void wifiDeinit()
     if (!_wifiInitialised)
         return;
 
-#if defined(CONFIG_IDF_TARGET_ESP32C5)
-    Serial.println("[WiFi] (C5) Deinit skipped - radio stays up.");
-    return;
+#if WIFI_KEEP_RADIO_ALIVE
+    Serial.println("[WiFi] Deinit skipped — radio stays up.");
 #else
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
