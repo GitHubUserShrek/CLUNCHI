@@ -1,0 +1,16 @@
+CLUNCHI Flash Info — CLUNCHI_XIAO_C5_V1
+================================================
+
+Chip:       ESP32-C5
+Flash mode: qio
+Flash freq: 80m
+Flash size: 8MB
+
+Option 1: Single factory image
+  Flash CLUNCHI_XIAO_C5_V1_FACTORY.bin at 0x0000
+
+Option 2: Individual files
+  bootloader.bin  -> 0x0000
+  partitions.bin  -> 0x8000
+  boot_app0.bin   -> 0xE000
+  firmware.bin    -> 0x10000
