@@ -34,6 +34,7 @@ static int gpsMenuCursor = 0;
 static int gpsSatPage = 0;
 static int gpsSpeedUnit = 0;
 static int settTimezone = 0;
+static MenuMode returnMenuFromSpeed = MENU_GPS;
 
 static Preferences prefs;
 static int sleepTimerCursor = 1;
@@ -241,6 +242,7 @@ static void act_gps_status()
 static void act_gps_speed()
 {
     currentMenu = MENU_GPS_SPEED;
+    returnMenuFromSpeed = MENU_GPS;
     gpsSpeedUnit = 0;
     menuLongHandled = true;
 }
@@ -354,6 +356,13 @@ static void act_wardriving()
     audio.beep(1000, 50);
     delay(80);
     audio.beep(1200, 50);
+}
+void openSpeedometerFromWardriving()
+{
+    currentMenu = MENU_GPS_SPEED;
+    returnMenuFromSpeed = MENU_OFF; 
+    gpsSpeedUnit = 0;
+    menuLongHandled = true;
 }
 
 static void act_ble_scan()
@@ -639,17 +648,20 @@ static void drawWifiScanScreen()
     if (scanActive)
     {
         uint32_t elapsed = (millis() - wifiScanStartTime()) / 1000;
+        uint32_t totalSec = WIFI_SCAN_DURATION / 1000;
+        uint32_t remaining = (elapsed < totalSec) ? (totalSec - elapsed) : 0;
+
         char l[32];
-        snprintf(l, 31, "Scanning... %us", (unsigned int)((WIFI_SCAN_DURATION / 1000) - elapsed));
+        snprintf(l, sizeof(l), "Scanning... %lus", (unsigned long)remaining);
         const char *itm[] = {l, "Hold: Cancel"};
         display.drawMenu("WIFI SCAN", itm, 2, -1);
     }
     else if (scanCount > 0)
     {
-        char l1[32], l2[32], l3[32];
-        snprintf(l1, 31, "%d/%d: %s", wifiMenuCursor + 1, scanCount, scanResults[wifiMenuCursor].ssid.c_str());
-        snprintf(l2, 31, "RSSI: %d dBm", (int)scanResults[wifiMenuCursor].rssi);
-        snprintf(l3, 31, "Ch:%d %s", scanResults[wifiMenuCursor].channel, scanResults[wifiMenuCursor].isOpen ? "OPEN" : "SECURED");
+        char l1[64], l2[64], l3[64];
+        snprintf(l1, sizeof(l1), "%d/%d: %s", wifiMenuCursor + 1, scanCount, scanResults[wifiMenuCursor].ssid.c_str());
+        snprintf(l2, sizeof(l2), "RSSI: %d dBm", (int)scanResults[wifiMenuCursor].rssi);
+        snprintf(l3, sizeof(l3), "Ch:%d %s", scanResults[wifiMenuCursor].channel, scanResults[wifiMenuCursor].isOpen ? "OPEN" : "SECURED");
         const char *itm[] = {l1, l2, l3, "Hold: Back"};
         display.drawMenu("SCAN RESULTS", itm, 4, -1);
     }
@@ -724,9 +736,12 @@ static void drawBleScanScreen()
     if (bleScanActive)
     {
         uint32_t elapsed = (millis() - bleScanStartTime()) / 1000;
+        uint32_t totalSec = BLE_SCAN_DURATION / 1000;
+        uint32_t remaining = (elapsed < totalSec) ? (totalSec - elapsed) : 0;
+
         char l1[32], l2[32];
-        snprintf(l1, 31, "Scanning... %lus", (unsigned int)((BLE_SCAN_DURATION / 1000) - elapsed));
-        snprintf(l2, 31, "Found: %d", bleCount);
+        snprintf(l1, sizeof(l1), "Scanning... %lus", (unsigned long)remaining);
+        snprintf(l2, sizeof(l2), "Found: %d", bleCount);
         const char *itm[] = {l1, l2, "Hold: Cancel"};
         display.drawMenu("BLE SCAN", itm, 3, -1);
     }
@@ -736,8 +751,8 @@ static void drawBleScanScreen()
         bleGetSortedIndices(idx, bleCount);
         int sortedIdx = idx[bleMenuCursor];
         const BLEResult &r = bleResults[sortedIdx];
-        char title[20];
-        char l1[32], l2[32], l3[32], l4[32];
+        char title[32];
+        char l1[64], l2[64], l3[64], l4[64];
         String primary;
         if (!r.name.isEmpty())
             primary = r.name;
@@ -747,11 +762,12 @@ static void drawBleScanScreen()
             primary = "Unknown Device";
         String manufacturer = r.manufacturer.isEmpty() ? "Unknown" : r.manufacturer;
         const char *addrType = r.isPublicAddr ? "Public" : "Private";
+        
         snprintf(title, sizeof(title), "BLE %d/%d", bleMenuCursor + 1, bleCount);
-        snprintf(l1, 31, "%s", primary.c_str());
-        snprintf(l2, 31, "%s", manufacturer.c_str());
-        snprintf(l3, 31, "RSSI:%d %s%s", r.rssi, addrType, r.isAlert ? " ALERT" : "");
-        snprintf(l4, 31, "%s", r.address.c_str());
+        snprintf(l1, sizeof(l1), "%s", primary.c_str());
+        snprintf(l2, sizeof(l2), "%s", manufacturer.c_str());
+        snprintf(l3, sizeof(l3), "RSSI:%d %s%s", r.rssi, addrType, r.isAlert ? " ALERT" : "");
+        snprintf(l4, sizeof(l4), "%s", r.address.c_str());
         const char *itm[] = {l1, l2, l3, l4};
         display.drawMenu(title, itm, 4, -1);
     }
@@ -1012,8 +1028,12 @@ void menuUpdate()
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
-            currentMenu = MENU_GPS;
-            menuCursor = gpsMenuCursor;
+            currentMenu = returnMenuFromSpeed;
+            
+            if (returnMenuFromSpeed == MENU_GPS)
+            {
+                menuCursor = gpsMenuCursor;
+            }
             audio.beep(900, 50);
         }
         drawGpsSpeedScreen();

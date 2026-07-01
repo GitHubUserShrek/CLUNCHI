@@ -34,3 +34,4 @@ void exitMenu();
 bool isMenuActive();
 void showConfirm(const char *line1, const char *line2,
                  MenuMode returnTo);
+void openSpeedometerFromWardriving();

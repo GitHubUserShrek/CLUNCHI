@@ -5,8 +5,18 @@
 #include <WiFi.h>
 #include <SD.h>
 
-#define WD_SCAN_INTERVAL_MS 3000
-#define WD_MAX_NETWORKS 60
+#if defined(BOARD_XIAO_C5)
+    #define WD_SCAN_INTERVAL_MS 1500
+    #define WD_MAX_NETWORKS     150
+    #define WD_SEEN_CAPACITY    4096
+#else
+    #define WD_SCAN_INTERVAL_MS 3000
+    #define WD_MAX_NETWORKS     60
+    #define WD_SEEN_CAPACITY    2048
+#endif
+
+#define WD_SEEN_EMPTY 0
+#define WD_SEEN_USED 1
 
 bool wardrivingActive = false;
 uint32_t wardrivingNetworksLogged = 0;
@@ -17,9 +27,8 @@ static uint32_t _lastScanTime = 0;
 static bool _scanRequested = false;
 static bool _scanning = false;
 
-#define WD_SEEN_CAPACITY 2048
-#define WD_SEEN_EMPTY 0
-#define WD_SEEN_USED 1
+static uint32_t _count24G = 0;
+static uint32_t _count5G = 0;
 
 struct SeenEntry
 {
@@ -220,7 +229,7 @@ static File openNetworkLog()
 
     if (f && isNew)
     {
-        f.println("time,lat,lon,alt,speed,sats,hdop,ssid,bssid,rssi,channel,encryption");
+        f.println("time,lat,lon,alt,speed,sats,hdop,ssid,bssid,rssi,channel,band,encryption");
         Serial.printf("[Wardriving] Created new log: %s\n", path.c_str());
     }
 
@@ -231,14 +240,20 @@ static void logScanResults()
 {
     int n = WiFi.scanComplete();
     if (n <= 0)
+    {
+        WiFi.scanDelete();
+        _scanning = false;
         return;
+    }
 
     checkAndRotateSession();
 
     File f = openNetworkLog();
     bool hasFile = (f == true);
 
-    int logged = 0;
+    int loggedThisScan = 0;
+    int batch24G = 0;
+    int batch5G = 0;
     int limit = min(n, WD_MAX_NETWORKS);
 
     for (int i = 0; i < limit; i++)
@@ -253,42 +268,28 @@ static void logScanResults()
         uint8_t ch = WiFi.channel(i);
         String enc;
 
+        const char* band = (ch > 14) ? "5G" : "2.4G";
+        if (ch > 14) { _count5G++; batch5G++; }
+        else { _count24G++; batch24G++; }
+
         switch (WiFi.encryptionType(i))
         {
-        case WIFI_AUTH_OPEN:
-            enc = "OPEN";
-            break;
-        case WIFI_AUTH_WEP:
-            enc = "WEP";
-            break;
-        case WIFI_AUTH_WPA_PSK:
-            enc = "WPA";
-            break;
-        case WIFI_AUTH_WPA2_PSK:
-            enc = "WPA2";
-            break;
-        case WIFI_AUTH_WPA_WPA2_PSK:
-            enc = "WPA/WPA2";
-            break;
-        case WIFI_AUTH_WPA3_PSK:
-            enc = "WPA3";
-            break;
-        case WIFI_AUTH_WPA2_WPA3_PSK:
-            enc = "WPA2/WPA3";
-            break;
-        case WIFI_AUTH_WPA2_ENTERPRISE:
-            enc = "WPA2-ENT";
-            break;
-        default:
-            enc = "OTHER";
-            break;
+        case WIFI_AUTH_OPEN:            enc = "OPEN"; break;
+        case WIFI_AUTH_WEP:             enc = "WEP"; break;
+        case WIFI_AUTH_WPA_PSK:         enc = "WPA"; break;
+        case WIFI_AUTH_WPA2_PSK:        enc = "WPA2"; break;
+        case WIFI_AUTH_WPA_WPA2_PSK:    enc = "WPA/WPA2"; break;
+        case WIFI_AUTH_WPA3_PSK:        enc = "WPA3"; break;
+        case WIFI_AUTH_WPA2_WPA3_PSK:   enc = "WPA2/WPA3"; break;
+        case WIFI_AUTH_WPA2_ENTERPRISE: enc = "WPA2-ENT"; break;
+        default:                        enc = "OTHER"; break;
         }
 
         ssid.replace(",", " ");
 
         char line[256];
         snprintf(line, sizeof(line),
-                 "%s,%.6f,%.6f,%.1f,%.1f,%d,%d,%s,%s,%d,%d,%s",
+                 "%s,%.6f,%.6f,%.1f,%.1f,%d,%d,%s,%s,%d,%d,%s,%s",
                  getTimeString().c_str(),
                  gpsData.latitude,
                  gpsData.longitude,
@@ -300,6 +301,7 @@ static void logScanResults()
                  bssid.c_str(),
                  (int)rssi,
                  (int)ch,
+                 band,
                  enc.c_str());
 
         if (hasFile)
@@ -307,10 +309,10 @@ static void logScanResults()
             f.println(line);
         }
 
-        Serial.printf("[WD] %s\n", line);
+        Serial.printf("[WD-%s] %s\n", band, line);
 
         markSeen(bssid);
-        logged++;
+        loggedThisScan++;
         wardrivingNetworksLogged++;
     }
 
@@ -322,13 +324,21 @@ static void logScanResults()
     WiFi.scanDelete();
     _scanning = false;
 
-    if (logged > 0)
+    if (loggedThisScan > 0)
     {
+#if defined(BOARD_XIAO_C5)
+        Serial.printf("[Wardriving] Logged %d new (%d@2.4G | %d@5G) | Total: %lu (%lu@2.4G | %lu@5G) | Table: %d/%d%s\n",
+                      loggedThisScan, batch24G, batch5G,
+                      (unsigned long)wardrivingNetworksLogged, _count24G, _count5G,
+                      _seenCount, WD_SEEN_CAPACITY,
+                      hasFile ? "" : " [NO SD]");
+#else
         Serial.printf("[Wardriving] Logged %d new networks (total: %lu, seen: %d/%d, part: %lu)%s\n",
-                      logged, (unsigned long)wardrivingNetworksLogged,
+                      loggedThisScan, (unsigned long)wardrivingNetworksLogged,
                       _seenCount, WD_SEEN_CAPACITY,
                       (unsigned long)_sessionPart,
-                      hasFile ? "" : " [SERIAL ONLY — no SD]");
+                      hasFile ? "" : " [SERIAL ONLY]");
+#endif
     }
 }
 

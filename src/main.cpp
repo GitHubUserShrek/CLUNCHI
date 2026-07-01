@@ -177,6 +177,24 @@ void loop()
     handleTouch();
     tiltUpdate();
 
+    if (!isMenuActive() && isWardrivingActive())
+    {
+        static uint32_t lastTapTime = 0;
+        if (touchJustReleased && !touchWasLongPress)
+        {
+            uint32_t now = millis();
+            if (now - lastTapTime < 350)
+            {
+                lastTapTime = 0;
+                openSpeedometerFromWardriving();
+                audio.beep(800, 40);
+                return;
+            }
+            lastTapTime = now;
+        }
+    }
+
+
     if (tiltEnabled() && !isMenuActive() && !wardrivingActive && !isRadarActive() && mood != SLEEPY)
     {
         if (isDribbleActive())

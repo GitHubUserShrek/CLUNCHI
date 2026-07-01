@@ -993,8 +993,12 @@ void Display::drawMenu(const char *title, const char **items, uint8_t itemCount,
     const int lineHeight = 12;
     const int menuTop = 15;
     int scrollOffset = (selectedIdx >= 4) ? selectedIdx - 3 : 0;
+    
     drawCentered(title, 11);
     u8g2_.drawHLine(2, 13, OLED_WIDTH - 4);
+
+    u8g2_.setClipWindow(3, 14, OLED_WIDTH - 3, OLED_HEIGHT - 2);
+
     for (int i = 0; i < 4; i++)
     {
         int idx = i + scrollOffset;
@@ -1008,9 +1012,40 @@ void Display::drawMenu(const char *title, const char **items, uint8_t itemCount,
         }
         if (idx == arrowIdx)
             u8g2_.drawStr(4, boxY + lineHeight - 2, "->");
-        drawCentered(items[idx], boxY + lineHeight - 2);
+
+        int strWidth = u8g2_.getStrWidth(items[idx]);
+        int maxWidth = OLED_WIDTH - 8; 
+        int textY = boxY + lineHeight - 2;
+
+        if (strWidth <= maxWidth) 
+        {
+            drawCentered(items[idx], textY);
+        } 
+        else 
+        {
+            int overflow = strWidth - maxWidth;
+            int pause = 25;
+            int cycle = (overflow * 2) + (pause * 2); 
+            int step = (millis() / 35) % cycle;       
+
+            int offset = 0;
+            if (step < pause) {
+                offset = 0;                          
+            } else if (step < pause + overflow) {
+                offset = step - pause;                
+            } else if (step < (pause * 2) + overflow) {
+                offset = overflow;                   
+            } else {
+                offset = overflow - (step - ((pause * 2) + overflow)); 
+            }
+
+            u8g2_.drawStr(4 - offset, textY, items[idx]);
+        }
+
         u8g2_.setDrawColor(1);
     }
+
+    u8g2_.setMaxClipWindow();
     u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
     render();
 }
