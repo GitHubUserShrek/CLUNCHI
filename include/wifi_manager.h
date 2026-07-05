@@ -67,3 +67,5 @@ float wifiTxPower();
 String wifiUptimeFormatted();
 int wifiSignalPercent();
 String wifiSignalLabel();
+
+void wifiForceReset(); 

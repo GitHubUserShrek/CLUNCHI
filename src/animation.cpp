@@ -104,12 +104,20 @@ void Animation::update(Mood currentMood)
     }
 
     uint32_t blinkMin = 3000, blinkMax = 7000;
-    if (currentMood == VIGILANT || currentMood == TACTICAL)
+    if (currentMood == VIGILANT || currentMood == TACTICAL
+#if defined(BOARD_XIAO_C5)
+        || currentMood == HUNTING
+#endif
+        )
     {
         blinkMin = 8000;
         blinkMax = 15000;
     }
-    if (currentMood == ENRAGED)
+    if (currentMood == ENRAGED
+#if defined(BOARD_XIAO_C5)
+        || currentMood == ALERT_CAMERA
+#endif
+        )
     {
         blinkMin = 6000;
         blinkMax = 12000;
@@ -215,6 +223,18 @@ void Animation::update(Mood currentMood)
         pupilX_ = (int)(sin(now / 800.0f) * 4.0f);
         pupilY_ = (int)(sin(now / 1200.0f) * 1.0f);
     }
+#if defined(BOARD_XIAO_C5)
+    else if (currentMood == HUNTING)
+    {
+        pupilX_ = (int)(sin(now / 400.0f) * 5.0f);
+        pupilY_ = (int)(sin(now / 600.0f) * 1.5f);
+    }
+    else if (currentMood == ALERT_CAMERA)
+    {
+        pupilX_ = 0;
+        pupilY_ = 0;
+    }
+#endif
     else if (currentMood == DRIVING)
     {
         pupilX_ = 0;
@@ -287,6 +307,16 @@ void Animation::update(Mood currentMood)
     {
         bounceY_ = sin(now / 300.0f) * 1.5f;
     }
+#if defined(BOARD_XIAO_C5)
+    else if (currentMood == HUNTING)
+    {
+        bounceY_ = sin(now / 500.0f) * 1.0f;
+    }
+    else if (currentMood == ALERT_CAMERA)
+    {
+        bounceY_ = sin(now / 30.0f) * 3.0f;
+    }
+#endif
     else
     {
         bounceY_ = 0;
@@ -294,7 +324,11 @@ void Animation::update(Mood currentMood)
 
     if (currentMood == SLEEPY)
         breathY_ = sin(now / 1000.0f) * 2.0f;
-    else if (currentMood == VIGILANT || currentMood == TACTICAL)
+    else if (currentMood == VIGILANT || currentMood == TACTICAL
+#if defined(BOARD_XIAO_C5)
+             || currentMood == HUNTING
+#endif
+             )
         breathY_ = sin(now / 1500.0f) * 1.0f;
     else
         breathY_ = 0;
@@ -303,9 +337,17 @@ void Animation::update(Mood currentMood)
         headTilt_ = dribbleBounce_ * 0.5f;
     else if (currentMood == CURIOUS)
         headTilt_ = sin(now / 600.0f) * 2.5f;
-    else if (currentMood == ENRAGED)
+    else if (currentMood == ENRAGED
+#if defined(BOARD_XIAO_C5)
+             || currentMood == ALERT_CAMERA
+#endif
+             )
         headTilt_ = sin(now / 150.0f) * 1.5f;
-    else if (currentMood == DRIVING || currentMood == TACTICAL)
+    else if (currentMood == DRIVING || currentMood == TACTICAL
+#if defined(BOARD_XIAO_C5)
+             || currentMood == HUNTING
+#endif
+             )
         headTilt_ = sin(now / 1200.0f) * 2.0f;
     else
         headTilt_ = 0;

@@ -15,6 +15,7 @@
 #include "gps_manager.h"
 #include "sd_manager.h"
 #include "wardriving.h"
+#include "alpr_detector.h"
 #include "tilt.h"
 
 Display display;
@@ -137,10 +138,8 @@ void loop()
         bleUpdate();
     if (widsActive)
         widsUpdate();
-
     if (nhActive && !widsHasRecentAlert(5000))
         netHealthUpdate();
-
     if (isDashboardActive())
         dashboardUpdate();
     if (sdActive)
@@ -150,6 +149,12 @@ void loop()
         wardrivingUpdate();
         gpsPrintStatus();
     }
+#if defined(BOARD_XIAO_C5)
+    if (alprDetectorActive)
+    {
+        alprDetectorUpdate();
+    }
+#endif
 
     if (wifiIsPortalActive())
     {
@@ -177,25 +182,12 @@ void loop()
     handleTouch();
     tiltUpdate();
 
-    if (!isMenuActive() && isWardrivingActive())
-    {
-        static uint32_t lastTapTime = 0;
-        if (touchJustReleased && !touchWasLongPress)
-        {
-            uint32_t now = millis();
-            if (now - lastTapTime < 350)
-            {
-                lastTapTime = 0;
-                openSpeedometerFromWardriving();
-                audio.beep(800, 40);
-                return;
-            }
-            lastTapTime = now;
-        }
-    }
-
-
-    if (tiltEnabled() && !isMenuActive() && !wardrivingActive && !isRadarActive() && mood != SLEEPY)
+    if (tiltEnabled() && !isMenuActive() && !wardrivingActive && 
+        !isRadarActive() && mood != SLEEPY
+    #if defined(BOARD_XIAO_C5)
+        && !alprDetectorActive
+    #endif
+        )
     {
         if (isDribbleActive())
         {
@@ -216,7 +208,11 @@ void loop()
         return;
     }
 
-    if (!isRadarActive() && !isWardrivingActive())
+    if (!isRadarActive() && !isWardrivingActive()
+    #if defined(BOARD_XIAO_C5)
+        && !isAlprDetectorActive()
+    #endif
+        )
     {
         evaluateTaps();
     }

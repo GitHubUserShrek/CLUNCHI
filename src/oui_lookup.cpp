@@ -5,11 +5,69 @@ struct OUIEntry {
     const char* manufacturer;
 };
 
+static const uint8_t alprOUIs[][3] = {
+    //Flock camera OUIs
+    {0x70, 0xc9, 0x4e}, {0x3c, 0x91, 0x80}, {0xd8, 0xf3, 0xbc},
+    {0x80, 0x30, 0x49}, {0xb8, 0x35, 0x32}, {0x14, 0x5a, 0xfc},
+    {0x74, 0x4c, 0xa1}, {0x08, 0x3a, 0x88}, {0x9c, 0x2f, 0x9d},
+    {0xc0, 0x35, 0x32}, {0x94, 0x08, 0x53}, {0xe4, 0xaa, 0xea},
+    {0xf4, 0x6a, 0xdd}, {0xf8, 0xa2, 0xd6}, {0x24, 0xb2, 0xb9},
+    {0x00, 0xf4, 0x8d}, {0xd0, 0x39, 0x57}, {0xe8, 0xd0, 0xfc},
+    {0xe0, 0x4f, 0x43}, {0xb8, 0x1e, 0xa4}, {0x70, 0x08, 0x94},
+    {0x58, 0x8e, 0x81}, {0xec, 0x1b, 0xbd}, {0x3c, 0x71, 0xbf},
+    {0x58, 0x00, 0xe3}, {0x90, 0x35, 0xea}, {0x5c, 0x93, 0xa2},
+    {0x64, 0x6e, 0x69}, {0x48, 0x27, 0xea}, {0xa4, 0xcf, 0x12},
+    // Flock Extended Battery units
+    {0xcc, 0xcc, 0xcc}, {0x04, 0x0d, 0x84}, {0xf0, 0x82, 0xc0},
+    {0x1c, 0x34, 0xf1}, {0x38, 0x5b, 0x44}, {0x94, 0x34, 0x69},
+    {0xb4, 0xe3, 0xf9},
+    // Motorola Solutions (Vigilant Solutions ALPR)
+    {0x00, 0x19, 0xc1}, {0x00, 0x1e, 0x0b}, {0x00, 0x24, 0x37},
+    {0x6c, 0x96, 0xcf}, {0x70, 0xb3, 0xd5}, {0x84, 0x24, 0x8d},
+    {0xd0, 0xd9, 0x4f}
+};
+static const size_t ALPR_OUI_COUNT = sizeof(alprOUIs) / sizeof(alprOUIs[0]);
+
+
+
+bool IRAM_ATTR isFlockOUI(const uint8_t* mac) {
+    if (!mac) return false;
+    if (mac[0] & 0x02) return false;
+
+    for (size_t i = 0; i < ALPR_OUI_COUNT; i++) {
+        if (mac[0] == alprOUIs[i][0] &&
+            mac[1] == alprOUIs[i][1] &&
+            mac[2] == alprOUIs[i][2]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isAlprOUI(const String& address) {
+    if (address.length() < 8) return false;
+    
+    uint8_t mac[3];
+    mac[0] = (uint8_t)strtol(address.substring(0, 2).c_str(), NULL, 16);
+    mac[1] = (uint8_t)strtol(address.substring(3, 5).c_str(), NULL, 16);
+    mac[2] = (uint8_t)strtol(address.substring(6, 8).c_str(), NULL, 16);
+    
+    return isAlprOUI(mac);
+}
+
 
 static const OUIEntry ouiTable[] = {
 
     { "80:7d:3a", "Flipper Devices" }, { "80:e1:26", "Flipper Devices" },
     { "80:e1:27", "Flipper Devices" }, { "0c:fa:22", "Flipper Devices" },  
+
+    { "00:19:c1", "Motorola Solutions" },
+    { "00:1e:0b", "Motorola Solutions" },
+    { "00:24:37", "Motorola Solutions" },
+    { "6c:96:cf", "Motorola Solutions" },
+    { "70:b3:d5", "Motorola Solutions" },
+    { "84:24:8d", "Motorola Solutions" },
+    { "d0:d9:4f", "Motorola Solutions" },
 
     { "b8:27:eb", "Raspberry Pi" }, { "dc:a6:32", "Raspberry Pi" },
     { "e4:5f:01", "Raspberry Pi" }, { "80:48:2c", "Raspberry Pi" },
@@ -87,22 +145,33 @@ static const OUIEntry ouiTable[] = {
 };
 static const int ouiCount = sizeof(ouiTable) / sizeof(ouiTable[0]);
 
-String lookupOUI(const String& address) {
-    if (address.length() < 8) return "";
 
-    if (address.equalsIgnoreCase("ff:ff:ff:ff:ff:ff")) return "Broadcast";
-
-    uint8_t firstOctet = (uint8_t)strtol(address.substring(0, 2).c_str(), NULL, 16);
+String lookupOUI(const char *address) {
+    if (!address || strlen(address) < 8) return "";
+    
+    if (strcasecmp(address, "ff:ff:ff:ff:ff:ff") == 0) return "Broadcast";
+    
+    char oct[3] = { address[0], address[1], '\0' };
+    uint8_t firstOctet = (uint8_t)strtol(oct, NULL, 16);
     if ((firstOctet & 0x02) != 0) {
         return "Random/Spoofed";
     }
-
-    String prefix = address.substring(0, 8);
-    prefix.toLowerCase();
-    for (int i = 0; i < ouiCount; i++) {
-        if (prefix == ouiTable[i].prefix) return ouiTable[i].manufacturer;
+    
+    char prefix[9];
+    for (int i = 0; i < 8; i++) {
+        prefix[i] = tolower(address[i]);
     }
-    return "";
+    prefix[8] = '\0';
+    
+    for (int i = 0; i < ouiCount; i++) {
+        if (strcmp(prefix, ouiTable[i].prefix) == 0) 
+            return String(ouiTable[i].manufacturer);
+    }
+    return String("");  
+}
+
+String lookupOUI(const String& address) {
+    return lookupOUI(address.c_str());
 }
 
 String decodeManufacturerID(uint16_t mfrId) {

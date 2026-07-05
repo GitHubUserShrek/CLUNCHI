@@ -55,6 +55,9 @@ static WiFiUDP _udp;
 static uint32_t _probeStartMs = 0;
 static uint8_t _betterCount = 0;
 static NetGrade _pendingGrade = NetGrade::UNKNOWN;
+static uint32_t _stateEnteredMs = 0;
+static ProbeState _lastState = ProbeState::IDLE;
+static uint8_t _probesThisRound = 0;
 
 const char *netGradeLabel(NetGrade g)
 {
@@ -228,6 +231,15 @@ static void _recalcStats()
         }
         netHealthConsecutiveFails = fails;
     }
+
+    Serial.printf("[NetHealth DEBUG] History has %d entries:\n", nhHistoryCount);
+    uint8_t debugN = 0;
+    _forEachEntry([&](const PingEntry &e) {
+        Serial.printf("  [%d] target=%d success=%d latency=%lums age=%lums\n",
+                      debugN++, e.targetIdx, e.success, 
+                      (unsigned long)e.latencyMs,
+                      (unsigned long)(millis() - e.timestamp));
+    });
 }
 
 static void _sendProbe()
@@ -253,6 +265,7 @@ void netHealthBegin()
     _lastRoundMs = millis() - NH_CHECK_INTERVAL_MS + 5000;
     _currentTarget = 0;
     _betterCount = 0;
+    _probesThisRound = 0; 
     netHealthIsUp = true;
     netHealthConsecutiveFails = 0;
     Serial.println("[NetHealth] Monitor started (UDP DNS).");
@@ -287,6 +300,20 @@ void netHealthUpdate()
 
     uint32_t now = millis();
 
+    if (_state != _lastState)
+    {
+        _stateEnteredMs = now;
+        _lastState = _state;
+    }
+
+    if (_state != ProbeState::IDLE && (now - _stateEnteredMs) > 30000)
+    {
+        Serial.println("[NetHealth] State machine stuck - forcing reset");
+        _udp.stop();
+        _state = ProbeState::IDLE;
+        _lastRoundMs = now;
+    }
+
     switch (_state)
     {
 
@@ -294,8 +321,22 @@ void netHealthUpdate()
         if (now - _lastRoundMs >= NH_CHECK_INTERVAL_MS)
         {
             _lastRoundMs = now;
-            _currentTarget = 0;
+            _currentTarget = random(NH_TARGET_COUNT); 
             _state = ProbeState::SENDING;
+        }
+        break;
+
+    case ProbeState::NEXT_TARGET:
+        _currentTarget = (_currentTarget + 1) % NH_TARGET_COUNT;
+        _probesThisRound++;
+        if (_probesThisRound < NH_TARGET_COUNT)
+        {
+            _state = ProbeState::SENDING;
+        }
+        else
+        {
+            _probesThisRound = 0;
+            _state = ProbeState::DONE;
         }
         break;
 
@@ -323,18 +364,32 @@ void netHealthUpdate()
 
         if (packetSize > 0)
         {
-            uint8_t buf[4];
+            uint8_t buf[16]; 
             int rd = _udp.read(buf, sizeof(buf));
             if (rd >= 4 &&
-                buf[0] == 0x00 && buf[1] == 0x01 &&
-                (buf[2] & 0x80))
+                buf[0] == 0x00 && buf[1] == 0x01 && 
+                (buf[2] & 0x80))                   
             {
-                success = true;
+                uint8_t rcode = buf[3] & 0x0F;
+                if (rcode == 0 || rcode == 3)
+                {
+                    success = true;
+                }
+                else
+                {
+                    success = true;
+                    Serial.printf("[NetHealth] DNS RCODE %d from %s\n",
+                                  rcode, TARGETS[_currentTarget].label);
+                }
             }
         }
 
         _udp.stop();
         _pushEntry(latencyMs, success, _currentTarget);
+
+
+Serial.printf("[NetHealth DEBUG] Pushed: latency=%lums success=%d target=%d\n",
+              (unsigned long)latencyMs, success, _currentTarget);
 
         Serial.printf("[NetHealth] %s → %s (%lums)\n",
                       TARGETS[_currentTarget].label,
@@ -345,17 +400,6 @@ void netHealthUpdate()
         break;
     }
 
-    case ProbeState::NEXT_TARGET:
-        _currentTarget++;
-        if (_currentTarget < NH_TARGET_COUNT)
-        {
-            _state = ProbeState::SENDING;
-        }
-        else
-        {
-            _state = ProbeState::DONE;
-        }
-        break;
 
     case ProbeState::DONE:
         _recalcStats();

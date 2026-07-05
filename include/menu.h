@@ -24,7 +24,11 @@ enum MenuMode
     MENU_DICE,
     MENU_MAGIC_8BALL,
     MENU_BLACKJACK,
-    MENU_CONFIRM
+    MENU_CONFIRM,
+    MENU_BLE_FINDER,          
+    MENU_BLE_FINDER_SCAN,     
+    MENU_BLE_FINDER_SELECT,  
+    MENU_BLE_FINDER_TRACK,     
 };
 
 void menuBegin();

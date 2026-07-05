@@ -1,0 +1,16 @@
+CLUNCHI Flash Info — CLUNCHI_C3_MINI_V1
+================================================
+
+Chip:       ESP32-C3
+Flash mode: dio
+Flash freq: 80m
+Flash size: 4MB
+
+Option 1: Single factory image
+  Flash CLUNCHI_C3_MINI_V1_FACTORY.bin at 0x0000
+
+Option 2: Individual files
+  bootloader.bin  -> 0x0000
+  partitions.bin  -> 0x8000
+  boot_app0.bin   -> 0xE000
+  firmware.bin    -> 0x10000

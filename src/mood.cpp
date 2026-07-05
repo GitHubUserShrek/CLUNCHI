@@ -10,6 +10,8 @@
 #include "mesh_wardrive.h"
 #include "net_health.h"
 #include "wardriving.h"
+#include "alpr_detector.h"
+#include "gps_manager.h"
 #include <Preferences.h>
 
 extern Audio audio;
@@ -23,44 +25,50 @@ static bool _wasConnected = false;
 static bool _wasNetDown = false;
 static bool _radarActive = false;
 static bool _wardrivingActive = false;
-static bool _wardrivingTouchLock = true;
+
+
 static bool _radarTouchLock = true;
+static bool _wardrivingTouchLock = true;
+
 static uint32_t _lastAlertTime = 0;
+
 static uint32_t _sleepTimeoutMs = 30000;
 static uint32_t _lastSettingsCheck = 0;
 
-bool isRadarActive() { return _radarActive; }
+#if defined(BOARD_XIAO_C5)
+static bool _alprActive = false;
+static bool _alprTouchLock = true;
+static uint32_t _lastAlprAlertTime = 0;
+#endif
 
+
+bool isRadarActive() { return _radarActive; }
+bool isWardrivingMoodActive() { return _wardrivingActive; }
+#if defined(BOARD_XIAO_C5)
+bool isAlprHunterMoodActive() { return _alprActive; }
+#endif
 Mood baseMood() { return wifiConnected() ? HAPPY : NEUTRAL; }
 
 const char *moodName(Mood m)
 {
     switch (m)
     {
-    case NEUTRAL:
-        return "NEUTRAL";
-    case HAPPY:
-        return "HAPPY";
-    case SLEEPY:
-        return "SLEEPY";
-    case ANNOYED:
-        return "ANNOYED";
-    case CURIOUS:
-        return "CURIOUS";
-    case JAZZED:
-        return "JAZZED";
-    case VIGILANT:
-        return "VIGILANT";
-    case ENRAGED:
-        return "ENRAGED";
-    case DEAD:
-        return "DEAD";
-    case DRIVING:
-        return "DRIVING";
-    case TACTICAL:
-        return "TACTICAL";
-    default:
-        return "???";
+    case NEUTRAL:      return "NEUTRAL";
+    case HAPPY:        return "HAPPY";
+    case SLEEPY:       return "SLEEPY";
+    case ANNOYED:      return "ANNOYED";
+    case CURIOUS:      return "CURIOUS";
+    case JAZZED:       return "JAZZED";
+    case VIGILANT:     return "VIGILANT";
+    case ENRAGED:      return "ENRAGED";
+    case DEAD:         return "DEAD";
+    case DRIVING:      return "DRIVING";
+    case TACTICAL:     return "TACTICAL";
+#if defined(BOARD_XIAO_C5)
+    case HUNTING:      return "HUNTING";
+    case ALERT_CAMERA: return "ALERT_CAMERA";
+#endif
+    default:           return "???";
     }
 }
 
@@ -305,8 +313,6 @@ static void _updateRadar(uint32_t now)
     }
 }
 
-bool isWardrivingMoodActive() { return _wardrivingActive; }
-
 void triggerWardriving()
 {
     _wardrivingActive = true;
@@ -336,12 +342,139 @@ static void _updateWardriving(uint32_t now)
 {
     if (!isTouched)
         _wardrivingTouchLock = false;
+    
     if (longTouchActive && !_wardrivingTouchLock)
     {
         exitWardriving();
         return;
     }
+    
+    static uint32_t lastWardrivingTap = 0;
+    static bool waitingForSecondTap = false;
+    const uint32_t DOUBLE_TAP_WINDOW_MS = 400;
+    
+    if (touchJustReleased && !touchWasLongPress)
+    {
+        if (waitingForSecondTap && (now - lastWardrivingTap) < DOUBLE_TAP_WINDOW_MS)
+        {
+            waitingForSecondTap = false;
+            
+            Serial.println("[Mood] Wardriving double-tap → Speedometer");
+            audio.beep(800, 30);
+            delay(50);
+            audio.beep(1000, 30);
+            
+            openSpeedometerFromWardriving();
+        }
+        else
+        {
+            waitingForSecondTap = true;
+            lastWardrivingTap = now;
+        }
+    }
+    
+    if (waitingForSecondTap && (now - lastWardrivingTap) > DOUBLE_TAP_WINDOW_MS)
+    {
+        waitingForSecondTap = false;
+    }
 }
+
+void resumeWardrivingView()
+{
+    _wardrivingTouchLock = true;
+    lastInteraction = millis();
+}
+
+#if defined(BOARD_XIAO_C5)
+void triggerAlprHunter()
+{
+    _alprActive = true;
+    _alprTouchLock = true;
+    _lastAlprAlertTime = 0;
+    
+    if (wardrivingActive) {
+        wardrivingEnd();
+    }
+    
+    alprDetectorBegin();
+    
+    _setMood(HUNTING);
+    lastInteraction = millis();
+    Serial.println("[Mood] === ALPR HUNTER MODE ACTIVATED ===");
+    audio.beep(1500, 50);
+    delay(30);
+    audio.beep(2000, 50);
+    delay(30);
+    audio.beep(2500, 50);
+}
+
+void exitAlprHunter()
+{
+    if (!_alprActive) return;
+    
+    _alprActive = false;
+    alprDetectorEnd();
+    bleForceResync();
+      bleReset(); 
+    
+    _setMood(baseMood());
+    lastInteraction = millis();
+    Serial.println("[Mood] === ALPR HUNTER MODE DEACTIVATED ===");
+    audio.beep(1000, 50);
+    delay(30);
+    audio.beep(700, 50);
+}
+
+void resumeAlprHunterView()
+{
+    _alprTouchLock = true;
+    lastInteraction = millis();
+}
+
+static void _updateAlprHunter(uint32_t now)
+{
+    const uint32_t ALPR_ALERT_CLEAR_MS = 4000;
+    
+    if (gpsActive) {
+        gpsUpdate();
+    }
+    
+    if (!isTouched)
+        _alprTouchLock = false;
+    
+    if (longTouchActive && !_alprTouchLock)
+    {
+        exitAlprHunter();
+        return;
+    }
+    
+    if (alprJustDetected)
+    {
+        alprJustDetected = false;
+        _lastAlprAlertTime = now;
+        
+        if (mood != ALERT_CAMERA)
+        {
+            _setMood(ALERT_CAMERA);
+            Serial.printf("[Mood] !!! %s %s DETECTED: %s @ RSSI %d\n", 
+                          alprVendorName(alprLastVendor),
+                          alprDeviceTypeName(alprLastType),
+                          alprLastMAC, (int)alprLastRSSI);
+            audio.beep(2000, 40);
+            delay(20);
+            audio.beep(2800, 40);
+            delay(20);
+            audio.beep(2000, 40);
+        }
+    }
+    
+    if (mood == ALERT_CAMERA && (now - _lastAlprAlertTime > ALPR_ALERT_CLEAR_MS))
+    {
+        _setMood(HUNTING);
+        Serial.println("[Mood] Back to hunting...");
+    }
+}
+#endif 
 
 static void _updateNetworkState(uint32_t now, bool connected)
 {
@@ -403,13 +536,19 @@ static void _updateMoodDecay(uint32_t now, bool connected)
     if (isDribbleActive())
         return;
 
-    if (_sleepTimeoutMs > 0 && idleTime > _sleepTimeoutMs && mood != SLEEPY && mood != DEAD && mood != DRIVING)
+    bool inSpecialMode = (mood == SLEEPY || mood == DEAD || mood == DRIVING);
+#if defined(BOARD_XIAO_C5)
+    inSpecialMode = inSpecialMode || (mood == HUNTING || mood == ALERT_CAMERA);
+#endif
+
+    if (_sleepTimeoutMs > 0 && idleTime > _sleepTimeoutMs && !inSpecialMode)
     {
         _setMood(SLEEPY);
         audio.sleepy();
         Serial.println("[Mood] HonkShoo mimimi");
         return;
     }
+    
     if (isTouched && mood == DEAD)
     {
         _setMood(NEUTRAL);
@@ -500,8 +639,10 @@ void moodUpdate(TouchEvent event)
 {
     if (wifiIsPortalActive())
         return;
+    
     uint32_t now = millis();
     bool connected = wifiConnected();
+    
     if (touchJustPressed)
     {
         lastInteraction = now;
@@ -512,6 +653,7 @@ void moodUpdate(TouchEvent event)
             animation.triggerBlink();
         }
     }
+    
     if (_radarActive)
     {
         _updateRadar(now);
@@ -522,6 +664,14 @@ void moodUpdate(TouchEvent event)
         _updateWardriving(now);
         return;
     }
+#if defined(BOARD_XIAO_C5)
+    if (_alprActive)
+    {
+        _updateAlprHunter(now);
+        return;
+    }
+#endif
+    
     if (!isMenuActive())
     {
         _handleTouchEvent(event, now);

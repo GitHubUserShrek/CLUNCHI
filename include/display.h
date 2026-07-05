@@ -12,6 +12,13 @@
 class Display
 {
 public:
+    struct FacePos {
+        int leftX, rightX;
+        int eyeYLeft, eyeYRight;
+        int mouthY, mouthCX;
+        int eyeHeight;
+    };
+
     bool begin();
     void clear();
     void render();
@@ -40,6 +47,14 @@ public:
     void bjReset() { blackjack_.reset(); }
     void drawBlackjackScreen(bool tiltMode);
 
+    void drawRssiBars(int x, int y, int bars);
+
+
+    #if defined(BOARD_XIAO_C5)
+    void drawHuntingReticle();
+    void drawAlprAlertMarks();
+#endif
+
 private:
     void drawSleepZzz(int frame);
     void drawHappySparkles();
@@ -51,6 +66,36 @@ private:
     void drawAlertMarks();
     void drawSpiralEye(int cx, int cy, int radius, float angle);
     void drawAttackFace(AnimState anim);
+
+    
+    void drawEyesSleepy(const FacePos &p);
+    void drawEyesJazzed(const FacePos &p);
+    void drawEyesSpiral(const AnimState &anim, const FacePos &p);
+    void drawEyesHeart(const FacePos &p);
+    void drawEyesCurious(const AnimState &anim, const FacePos &p);
+    void drawEyesVigilant(const AnimState &anim, const FacePos &p);
+    bool drawEyesTactical(const AnimState &anim, const FacePos &p);
+    void drawEyesDriving(const FacePos &p);
+    void drawEyesEnraged(const AnimState &anim, const FacePos &p);
+    void drawEyesDead(const FacePos &p);
+    void drawEyesDefault(const AnimState &anim, const FacePos &p, Mood currentMood);
+    
+    void drawMouthForMood(Mood currentMood, const AnimState &anim, const FacePos &p);
+    
+    void drawMoodDecorations(Mood currentMood, const AnimState &anim);
+    void drawVigilantFooter();
+    void drawTacticalFooter();
+    void drawDrivingFooter();
+    
+    void drawBeaconFloodFace(const AnimState &anim, const FacePos &p, int eyeR);
+    
+    #if defined(BOARD_XIAO_C5)
+    void drawEyesHunting(const AnimState &anim, const FacePos &p);
+    void drawEyesAlertCamera(const FacePos &p);
+    void drawAlprHunterFooter(Mood currentMood);
+    #endif
+
+    FacePos computeFacePos(const AnimState &anim);
 
     U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_{U8G2_R0, U8X8_PIN_NONE};
     bool ready_ = false;

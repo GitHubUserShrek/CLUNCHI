@@ -16,17 +16,19 @@ struct BLEResult
     bool isKnown;
 };
 
-extern BLEResult bleResults[40];
+extern BLEResult bleResults[100];
 extern int bleCount;
 extern bool bleScanActive;
 extern uint32_t bleAlertsLoggedTotal;
+extern bool scanFinished;
 
 void bleBegin();
 void bleDeinit();
 bool isBleInitialised();
 void bleStartScan();
 void bleStopScan();
-void bleCancelScan();
+void bleForceResync();
+void bleReset();
 uint32_t bleScanStartTime();
 
 void bleStartRadar();
@@ -40,3 +42,14 @@ bool bleHasAlerts();
 void bleGetSortedIndices(int *idx, int count);
 void blePrintInfo();
 void blePrintAlerts();
+
+extern String targetTrackerMac;
+extern int targetTrackerRssi;
+extern int targetTrackerPeakRssi;
+extern uint32_t targetTrackerLastSeen;
+extern bool rssiTrackerActive;
+
+void bleStartRssiTracker(const String& targetMac);
+void bleStopRssiTracker();
+void bleRssiTrackerUpdate();  
+int getRssiTrackerBars();   

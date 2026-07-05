@@ -60,3 +60,5 @@ void widsPrintLog();
 String widsMacToString(const uint8_t *mac);
 const char *widsReasonString(uint16_t reason);
 const char *widsAttackTypeString(AttackType type);
+
+void widsMacToBuf(const uint8_t *mac, char *outBuf);

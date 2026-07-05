@@ -15,6 +15,10 @@ enum Mood
     DEAD,
     DRIVING,
     TACTICAL,
+#if defined(BOARD_XIAO_C5)
+    HUNTING,      
+    ALERT_CAMERA,   
+#endif
     MOOD_COUNT
 };
 
@@ -32,6 +36,19 @@ bool isRadarActive();
 void triggerWardriving();
 void exitWardriving();
 bool isWardrivingMoodActive();
+void resumeWardrivingView();
+
+#if defined(BOARD_XIAO_C5)
+    void triggerAlprHunter();
+    void exitAlprHunter();
+    bool isAlprHunterMoodActive();
+    void resumeAlprHunterView();
+#else
+    inline void triggerAlprHunter() {}
+    inline void exitAlprHunter() {}
+    inline bool isAlprHunterMoodActive() { return false; }
+    inline void resumeAlprHunterView() {}
+#endif
 
 const char *moodName(Mood m);
 Mood baseMood();
