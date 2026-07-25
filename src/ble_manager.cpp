@@ -10,7 +10,6 @@
 
 extern Audio audio;
 
-
 struct BLEAlertRule
 {
     const char *nameContains;
@@ -33,7 +32,6 @@ static const BLEAlertRule alertRules[] = {
 };
 static const int alertRuleCount = sizeof(alertRules) / sizeof(alertRules[0]);
 
-
 BLEResult bleResults[100];
 int bleCount = 0;
 bool bleScanActive = false;
@@ -46,7 +44,6 @@ int targetTrackerPeakRssi = -127;
 uint32_t targetTrackerLastSeen = 0;
 bool rssiTrackerActive = false;
 
-
 static bool _bleInitialised = false;
 static uint32_t _scanStartTime = 0;
 static NimBLEScan *_pScan = nullptr;
@@ -56,9 +53,8 @@ static const uint32_t RADAR_SWEEP_MS = 5000;
 static uint32_t _lastPulseTime = 0;
 static uint32_t _pulseInterval = 1000;
 
-
 static String buildDeviceType(const NimBLEAdvertisedDevice *device, const String &addr,
-                                bool isPublic, String &outManufacturer, bool isMesh)
+                              bool isPublic, String &outManufacturer, bool isMesh)
 {
     if (isMesh)
     {
@@ -115,9 +111,8 @@ static String buildDeviceType(const NimBLEAdvertisedDevice *device, const String
     return isPublic ? "Unknown Device" : "Private Device";
 }
 
-
 static bool checkAlert(const String &addr, const String &name, const String &mfr,
-                        const String &dtype, const NimBLEAdvertisedDevice *device, String &outLabel)
+                       const String &dtype, const NimBLEAdvertisedDevice *device, String &outLabel)
 {
     String prefix = addr.substring(0, 8);
     prefix.toLowerCase();
@@ -189,14 +184,13 @@ static bool checkAlert(const String &addr, const String &name, const String &mfr
     return false;
 }
 
-
 class BLEScanHandler : public NimBLEScanCallbacks
 {
 public:
     void onResult(const NimBLEAdvertisedDevice *device) override
     {
-        if (!device) return;
-
+        if (!device)
+            return;
 
         if (rssiTrackerActive)
         {
@@ -211,10 +205,11 @@ public:
                 if (targetTrackerRssi > targetTrackerPeakRssi)
                     targetTrackerPeakRssi = targetTrackerRssi;
             }
-            return;  
+            return;
         }
 
-        if (!bleScanActive) return;
+        if (!bleScanActive)
+            return;
 
         String addr = device->getAddress().toString().c_str();
 
@@ -227,7 +222,8 @@ public:
             }
         }
 
-        if (bleCount >= 40) return;
+        if (bleCount >= 40)
+            return;
 
         String name = device->haveName() ? device->getName().c_str() : "";
         int rssi = device->getRSSI();
@@ -296,22 +292,22 @@ public:
         Serial.printf("[BLE] Scan ended (reason %d, %d devices)\n", reason, bleCount);
         bleScanActive = false;
         scanFinished = true;
-
-        
     }
 };
 
 static BLEScanHandler _scanHandler;
 
-
 static void logAlertsToSD()
 {
-    if (!sdActive) return;
+    if (!sdActive)
+        return;
 
     int alertCount = 0;
     for (int i = 0; i < bleCount; i++)
-        if (bleResults[i].isAlert) alertCount++;
-    if (alertCount == 0) return;
+        if (bleResults[i].isAlert)
+            alertCount++;
+    if (alertCount == 0)
+        return;
 
     if (!SD.exists("/ble_alerts"))
         SD.mkdir("/ble_alerts");
@@ -347,7 +343,8 @@ static void logAlertsToSD()
 
     for (int i = 0; i < bleCount; i++)
     {
-        if (!bleResults[i].isAlert) continue;
+        if (!bleResults[i].isAlert)
+            continue;
         const BLEResult &r = bleResults[i];
 
         String name = r.name.isEmpty() ? "Unknown" : r.name;
@@ -373,7 +370,8 @@ static void logAlertsToSD()
 
 void bleBegin()
 {
-    if (_bleInitialised) return;
+    if (_bleInitialised)
+        return;
 
     Serial.println("[BLE] Radio Initializing...");
     NimBLEDevice::init("CLUNCHI");
@@ -400,7 +398,8 @@ void bleBegin()
 
 void bleDeinit()
 {
-    if (!_bleInitialised) return;
+    if (!_bleInitialised)
+        return;
 
 #if BLE_KEEP_STACK_ALIVE
     if (_pScan && _pScan->isScanning())
@@ -439,32 +438,36 @@ void bleDeinit()
 
 bool isBleInitialised() { return _bleInitialised; }
 
-void bleForceResync() {
-    if (!_bleInitialised) return;
-    
+void bleForceResync()
+{
+    if (!_bleInitialised)
+        return;
+
     Serial.println("[BLE] Resyncing hardware callbacks...");
-    
-    if (_pScan->isScanning()) {
+
+    if (_pScan->isScanning())
+    {
         _pScan->stop();
     }
-    
+
     _pScan->setScanCallbacks(&_scanHandler, false);
-    
+
     _pScan->start(0, false);
     bleScanActive = true;
 }
 
-void bleReset() {
+void bleReset()
+{
     bleCount = 0;
     bleScanActive = false;
-    if (_pScan) {
+    if (_pScan)
+    {
         _pScan->stop();
         _pScan->clearResults();
     }
     memset(bleResults, 0, sizeof(bleResults));
     Serial.println("[BLE] Internal state reset.");
 }
-
 
 void bleStartScan()
 {
@@ -473,8 +476,9 @@ void bleStartScan()
         Serial.println("[BLE] Error: Call bleBegin first.");
         return;
     }
-   
-    if (bleScanActive) return;
+
+    if (bleScanActive)
+        return;
     if (!_pScan)
     {
         Serial.println("[BLE] Error: _pScan is null!");
@@ -484,9 +488,8 @@ void bleStartScan()
     Serial.println("[BLE] Scanning started...");
     bleCount = 0;
     _scanStartTime = millis();
-    scanFinished = false; 
+    scanFinished = false;
     bleScanActive = true;
-   
 
     _pScan->setActiveScan(true);
     _pScan->setInterval(100);
@@ -504,7 +507,8 @@ void bleStartScan()
 
 void bleStopScan()
 {
-    if (!_pScan) return;
+    if (!_pScan)
+        return;
     if (_pScan->isScanning())
     {
         _pScan->stop();
@@ -516,11 +520,12 @@ void bleStopScan()
 
 uint32_t bleScanStartTime() { return _scanStartTime; }
 
-
 void bleStartRadar()
 {
-    if (!_bleInitialised) bleBegin();
-    if (!_pScan) return;
+    if (!_bleInitialised)
+        bleBegin();
+    if (!_pScan)
+        return;
 
     _radarMode = true;
     bleCount = 0;
@@ -554,7 +559,8 @@ void bleStopRadar()
 
 void bleForceSweep()
 {
-    if (!_bleInitialised || !_radarMode || !_pScan) return;
+    if (!_bleInitialised || !_radarMode || !_pScan)
+        return;
 
     if (_pScan->isScanning())
     {
@@ -569,10 +575,10 @@ void bleForceSweep()
     Serial.println("[BLE] Forced sweep started.");
 }
 
-
 void bleUpdate()
 {
-    if (!_bleInitialised || !_pScan) return;
+    if (!_bleInitialised || !_pScan)
+        return;
 
     if (_radarMode)
     {
@@ -600,7 +606,8 @@ void bleUpdate()
         return;
     }
 
-    if (!bleScanActive) return;
+    if (!bleScanActive)
+        return;
 
     if (millis() - _scanStartTime > BLE_SCAN_DURATION)
     {
@@ -616,11 +623,12 @@ void bleUpdate()
     }
 }
 
-
 void bleStartRssiTracker(const String &targetMac)
 {
-    if (!_bleInitialised) bleBegin();
-    if (!_pScan) return;
+    if (!_bleInitialised)
+        bleBegin();
+    if (!_pScan)
+        return;
 
     targetTrackerMac = targetMac;
     targetTrackerMac.toLowerCase();
@@ -639,7 +647,7 @@ void bleStartRssiTracker(const String &targetMac)
     _pScan->setActiveScan(true);
     _pScan->setInterval(160);
     _pScan->setWindow(160);
-    _pScan->setDuplicateFilter(false);  
+    _pScan->setDuplicateFilter(false);
     _pScan->setMaxResults(0);
     _pScan->clearResults();
 
@@ -669,21 +677,29 @@ void bleStopRssiTracker()
 
 int getRssiTrackerBars()
 {
-    if (millis() - targetTrackerLastSeen > 15000) return 0;
+    if (millis() - targetTrackerLastSeen > 15000)
+        return 0;
 
     int rssi = targetTrackerRssi;
-    if (rssi >= -40) return 5;   // Very close (< 1m)
-    if (rssi >= -55) return 4;   // Close (1-3m)
-    if (rssi >= -70) return 3;   // Medium (3-8m)
-    if (rssi >= -80) return 2;   // Far (8-15m)
-    if (rssi >= -90) return 1;   // Very far (15-30m)
+    if (rssi >= -40)
+        return 5; // Very close
+    if (rssi >= -55)
+        return 4; // Close
+    if (rssi >= -70)
+        return 3; // Medium
+    if (rssi >= -80)
+        return 2; // Far
+    if (rssi >= -90)
+        return 1; // Very far
     return 0;
 }
 
 void bleRssiTrackerUpdate()
 {
-    if (!rssiTrackerActive) return;
-    if (!_pScan) return;
+    if (!rssiTrackerActive)
+        return;
+    if (!_pScan)
+        return;
 
     uint32_t now = millis();
 
@@ -705,8 +721,10 @@ void bleRssiTrackerUpdate()
     else
     {
         int rssi = targetTrackerRssi;
-        if (rssi > -40) rssi = -40;
-        if (rssi < -90) rssi = -90;
+        if (rssi > -40)
+            rssi = -40;
+        if (rssi < -90)
+            rssi = -90;
         _pulseInterval = 100 + ((-40 - rssi) * (1500 - 100)) / (90 - 40);
     }
 
@@ -714,17 +732,17 @@ void bleRssiTrackerUpdate()
     {
         _lastPulseTime = now;
         int bars = getRssiTrackerBars();
-        int freq = 400 + (bars * 300); 
+        int freq = 400 + (bars * 300);
         audio.beep(freq, 30);
     }
 }
-
 
 int bleAlertCount()
 {
     int count = 0;
     for (int i = 0; i < bleCount; i++)
-        if (bleResults[i].isAlert) count++;
+        if (bleResults[i].isAlert)
+            count++;
     return count;
 }
 
@@ -776,14 +794,16 @@ void blePrintInfo()
 void blePrintAlerts()
 {
     int alerts = bleAlertCount();
-    if (alerts == 0) return;
+    if (alerts == 0)
+        return;
 
     Serial.printf("[BLE] !!! %d THREATS DETECTED !!!\n", alerts);
     Serial.println("[BLE] ------------------------------------------");
 
     for (int i = 0; i < bleCount; i++)
     {
-        if (!bleResults[i].isAlert) continue;
+        if (!bleResults[i].isAlert)
+            continue;
         const BLEResult &r = bleResults[i];
         Serial.printf("[BLE] ! THREAT | %-18s | %s | %s | %d dBm\n",
                       r.alertLabel.c_str(), r.address.c_str(),

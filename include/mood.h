@@ -17,7 +17,9 @@ enum Mood
     TACTICAL,
 #if defined(BOARD_XIAO_C5)
     HUNTING,      
-    ALERT_CAMERA,   
+    ALERT_CAMERA,
+    BATTERY_STATUS,
+    LOW_BATTERY,     
 #endif
     MOOD_COUNT
 };
@@ -49,6 +51,8 @@ void resumeWardrivingView();
     inline bool isAlprHunterMoodActive() { return false; }
     inline void resumeAlprHunterView() {}
 #endif
+
+void forceSetMood(Mood m); 
 
 const char *moodName(Mood m);
 Mood baseMood();

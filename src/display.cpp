@@ -21,18 +21,18 @@ Display::FacePos Display::computeFacePos(const AnimState &anim)
 {
     Display::FacePos p;
     int offsetY = (int)anim.bounceY + (int)anim.breathY + (int)anim.squishY;
-    
+
     p.leftX = BASE_LEFT_X + (int)anim.leftEyeOffX;
     p.rightX = BASE_RIGHT_X + (int)anim.rightEyeOffX;
     p.eyeYLeft = BASE_EYE_Y + offsetY + (int)anim.leftEyeOffY;
     p.eyeYRight = BASE_EYE_Y + offsetY + (int)anim.rightEyeOffY;
     p.mouthY = BASE_MOUTH_Y + offsetY + (int)anim.mouthOffY;
     p.mouthCX = BASE_MOUTH_CX + (int)anim.mouthOffX;
-    
+
     p.eyeHeight = EYE_R * 2;
     if (anim.blink > 0)
         p.eyeHeight = std::max(2, (int)(p.eyeHeight * (1.0f - anim.blink)));
-    
+
     return p;
 }
 
@@ -55,12 +55,14 @@ bool Display::begin()
 
 void Display::clear()
 {
-    if (ready_) u8g2_.clearBuffer();
+    if (ready_)
+        u8g2_.clearBuffer();
 }
 
 void Display::render()
 {
-    if (ready_) u8g2_.sendBuffer();
+    if (ready_)
+        u8g2_.sendBuffer();
 }
 
 void Display::drawCentered(const char *text, int y)
@@ -93,7 +95,8 @@ void Display::drawSpiralEye(int cx, int cy, int radius, float angle)
         for (float theta = 0.5f; theta < maxTheta; theta += thetaStep)
         {
             float r = (armSpacing / (2.0f * PI)) * theta;
-            if (r > radius) break;
+            if (r > radius)
+                break;
             float drawAngle = theta + angle + armOffset;
             int px = cx + (int)(cos(drawAngle) * r);
             int py = cy + (int)(sin(drawAngle) * r);
@@ -179,7 +182,7 @@ static void drawCtsJammingFace(U8G2 &u8g2, const AnimState &anim, const Display:
     u8g2.drawDisc(p.leftX + anim.pupilX, p.eyeYLeft + anim.pupilY, 2);
     u8g2.drawDisc(p.rightX + anim.pupilX, p.eyeYRight + anim.pupilY, 2);
     u8g2.setDrawColor(1);
-    
+
     u8g2.drawBox(p.mouthCX - 12, p.mouthY - 4, 24, 8);
     u8g2.setDrawColor(0);
     for (int x = p.mouthCX - 10; x < p.mouthCX + 10; x += 5)
@@ -195,13 +198,13 @@ static void drawHandshakeCaptureFace(U8G2 &u8g2, const AnimState &anim, const Di
     u8g2.drawDisc(p.leftX + 2 + anim.pupilX, p.eyeYLeft - 1 + anim.pupilY, 2);
     u8g2.drawDisc(p.rightX + 2 + anim.pupilX, p.eyeYRight - 1 + anim.pupilY, 2);
     u8g2.setDrawColor(1);
-    
+
     int wave = (int)(sin(millis() / 150.0f) * 2.0f);
     u8g2.drawLine(p.mouthCX - 8, p.mouthY + wave, p.mouthCX - 4, p.mouthY - wave);
     u8g2.drawLine(p.mouthCX - 4, p.mouthY - wave, p.mouthCX, p.mouthY + wave);
     u8g2.drawLine(p.mouthCX, p.mouthY + wave, p.mouthCX + 4, p.mouthY - wave);
     u8g2.drawLine(p.mouthCX + 4, p.mouthY - wave, p.mouthCX + 8, p.mouthY + wave);
-    
+
     int lx = 112, ly = 48;
     u8g2.drawFrame(lx, ly + 4, 8, 7);
     u8g2.drawCircle(lx + 4, ly + 4, 3, U8G2_DRAW_UPPER_LEFT);
@@ -346,7 +349,7 @@ void Display::drawEyesHeart(const FacePos &p)
 {
     drawHeart(p.leftX, p.eyeYLeft);
     drawHeart(p.rightX, p.eyeYRight);
-    
+
     int cheekYL = p.eyeYLeft + 9;
     int cheekYR = p.eyeYRight + 9;
     u8g2_.drawVLine(p.leftX - 3, cheekYL, 4);
@@ -364,7 +367,7 @@ void Display::drawEyesCurious(const AnimState &anim, const FacePos &p)
     int tilt = (int)anim.headTilt;
     int lEY = p.eyeYLeft + tilt;
     int rEY = p.eyeYRight - tilt;
-    
+
     u8g2_.drawDisc(p.leftX, lEY, EYE_R);
     u8g2_.drawDisc(p.rightX, rEY, EYE_R + 3);
     u8g2_.setDrawColor(0);
@@ -381,7 +384,7 @@ void Display::drawEyesVigilant(const AnimState &anim, const FacePos &p)
     const int pupilSize = 2;
     int leftSlitX = p.leftX - (slitWidth / 2);
     int rightSlitX = p.rightX - (slitWidth / 2);
-    
+
     u8g2_.drawBox(leftSlitX, p.eyeYLeft - (slitHeight / 2), slitWidth, slitHeight);
     u8g2_.drawBox(rightSlitX, p.eyeYRight - (slitHeight / 2), slitWidth, slitHeight);
     u8g2_.setDrawColor(0);
@@ -404,9 +407,9 @@ bool Display::drawEyesTactical(const AnimState &anim, const FacePos &p)
         u8g2_.drawStr((OLED_WIDTH - tw) / 2, 61, "[ ACQUIRING NODE ]");
         u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
         render();
-        return true;  
+        return true;
     }
-    
+
     int visorW = (p.rightX - p.leftX) + 28;
     int visorX = p.leftX - 14;
     int visorY = p.eyeYLeft - 8;
@@ -423,9 +426,9 @@ bool Display::drawEyesTactical(const AnimState &anim, const FacePos &p)
         int startX = visorX + 4;
         int endX = visorX + visorW - 7;
         int range = endX - startX;
-        int laserX = (sweepTime < 700) 
-                     ? (startX + (sweepTime * range) / 700) 
-                     : (endX - ((sweepTime - 700) * range) / 700);
+        int laserX = (sweepTime < 700)
+                         ? (startX + (sweepTime * range) / 700)
+                         : (endX - ((sweepTime - 700) * range) / 700);
 
         u8g2_.drawBox(laserX, visorY + 3, 3, 10);
         if (sweepTime < 700)
@@ -433,11 +436,11 @@ bool Display::drawEyesTactical(const AnimState &anim, const FacePos &p)
         else
             u8g2_.drawVLine(laserX + 3, visorY + 4, 8);
     }
-    
+
     u8g2_.drawHLine(p.mouthCX - 6, p.mouthY, 12);
     u8g2_.drawPixel(p.mouthCX - 7, p.mouthY - 1);
     u8g2_.drawPixel(p.mouthCX + 6, p.mouthY - 1);
-    
+
     return false;
 }
 
@@ -445,12 +448,12 @@ void Display::drawEyesDriving(const FacePos &p)
 {
     uint32_t now = millis();
     float cycle = fmod(now / 4000.0f, 1.0f);
-    
+
     if (cycle > 0.4f && cycle < 0.6f)
     {
         float winkPhase = (cycle - 0.4f) / 0.2f;
         float winkAmount = sin(winkPhase * PI);
-        
+
         if (winkAmount > 0.8f)
         {
             u8g2_.drawLine(p.leftX - 5, p.eyeYLeft - 4, p.leftX + 2, p.eyeYLeft);
@@ -482,15 +485,15 @@ void Display::drawEyesDriving(const FacePos &p)
         u8g2_.drawDisc(p.leftX + 2, p.eyeYLeft - 1, 2);
         u8g2_.setDrawColor(1);
     }
-    
+
     u8g2_.drawLine(p.leftX - 8, p.eyeYLeft - 10, p.leftX + 6, p.eyeYLeft - 9);
     u8g2_.drawLine(p.leftX - 8, p.eyeYLeft - 11, p.leftX + 6, p.eyeYLeft - 10);
-    
+
     u8g2_.drawDisc(p.rightX, p.eyeYRight - 2, EYE_R + 1);
     u8g2_.setDrawColor(0);
     u8g2_.drawDisc(p.rightX + 2, p.eyeYRight - 3, 2);
     u8g2_.setDrawColor(1);
-    
+
     float browCycle = fmod(millis() / 3000.0f, 1.0f);
     float browRaise = sin(browCycle * PI * 2) * 3.0f;
     int browY = p.eyeYRight - 14 - (int)browRaise;
@@ -603,10 +606,10 @@ void Display::drawEyesEnraged(const AnimState &anim, const FacePos &p)
         u8g2_.drawDisc(p.rightX + anim.pupilX, p.eyeYRight + anim.pupilY, 1);
         u8g2_.setDrawColor(1);
     }
-    
+
     u8g2_.drawLine(p.leftX - 8, p.eyeYLeft - 13, p.leftX + 5, p.eyeYLeft - 7);
     u8g2_.drawLine(p.rightX + 8, p.eyeYRight - 13, p.rightX - 5, p.eyeYRight - 7);
-    
+
     u8g2_.drawLine(p.leftX - 14, p.eyeYLeft - 8, p.leftX - 10, p.eyeYLeft - 4);
     u8g2_.drawLine(p.leftX - 10, p.eyeYLeft - 8, p.leftX - 14, p.eyeYLeft - 4);
     u8g2_.drawLine(p.rightX + 14, p.eyeYRight - 8, p.rightX + 10, p.eyeYRight - 4);
@@ -645,7 +648,7 @@ void Display::drawEyesDefault(const AnimState &anim, const FacePos &p, Mood curr
             u8g2_.setDrawColor(1);
         }
     }
-    
+
     if (currentMood == ANNOYED)
     {
         u8g2_.drawLine(p.leftX - 5, p.eyeYLeft - 10, p.leftX + 4, p.eyeYLeft - 6);
@@ -765,8 +768,9 @@ void Display::drawMouthForMood(Mood currentMood, const AnimState &anim, const Fa
 
 void Display::drawMoodDecorations(Mood currentMood, const AnimState &anim)
 {
-    if (anim.dribbling) return;
-    
+    if (anim.dribbling)
+        return;
+
     if (currentMood == HAPPY)
         drawHappySparkles();
     if (currentMood == SLEEPY && (millis() / 500) % 2)
@@ -810,7 +814,7 @@ void Display::drawVigilantFooter()
         int sy = 59;
         bool isLit = (millis() / 300) % 2;
         u8g2_.drawHLine(sx - 1, sy, 9);
-        
+
         if (isLit)
         {
             u8g2_.drawBox(sx, sy - 4, 7, 4);
@@ -857,11 +861,11 @@ void Display::drawTacticalFooter()
 static void drawWifiSignalIcon(U8G2 &u8g2, int wifiX, int wifiY)
 {
     u8g2.drawPixel(wifiX + 4, wifiY - 1);
-    
+
     u8g2.drawPixel(wifiX + 3, wifiY - 3);
     u8g2.drawPixel(wifiX + 4, wifiY - 4);
     u8g2.drawPixel(wifiX + 5, wifiY - 3);
-    
+
     u8g2.drawPixel(wifiX + 1, wifiY - 4);
     u8g2.drawPixel(wifiX + 2, wifiY - 5);
     u8g2.drawPixel(wifiX + 3, wifiY - 6);
@@ -869,9 +873,9 @@ static void drawWifiSignalIcon(U8G2 &u8g2, int wifiX, int wifiY)
     u8g2.drawPixel(wifiX + 5, wifiY - 6);
     u8g2.drawPixel(wifiX + 6, wifiY - 5);
     u8g2.drawPixel(wifiX + 7, wifiY - 4);
-    
+
     u8g2.drawPixel(wifiX - 1, wifiY - 6);
-    u8g2.drawPixel(wifiX,     wifiY - 7);
+    u8g2.drawPixel(wifiX, wifiY - 7);
     u8g2.drawPixel(wifiX + 1, wifiY - 8);
     u8g2.drawPixel(wifiX + 2, wifiY - 8);
     u8g2.drawPixel(wifiX + 3, wifiY - 9);
@@ -899,7 +903,7 @@ static void drawGpsIcon(U8G2 &u8g2, int gx, int gy, bool valid, int sats)
         u8g2.drawStr(gx + 12, 60, satBuf);
         u8g2.drawCircle(gx + 2, gy - 3, 3, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
     }
-    else if ((millis() / 500) % 2)  
+    else if ((millis() / 500) % 2)
     {
         u8g2.drawStr(gx + 12, 60, "0");
         u8g2.drawCircle(gx + 2, gy - 3, 3, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
@@ -909,7 +913,7 @@ static void drawGpsIcon(U8G2 &u8g2, int gx, int gy, bool valid, int sats)
 void Display::drawDrivingFooter()
 {
     u8g2_.setFont(u8g2_font_5x7_tr);
-    
+
     u8g2_.drawStr(3, 20, "W");
     u8g2_.drawStr(3, 30, "A");
     u8g2_.drawStr(3, 40, "R");
@@ -967,7 +971,8 @@ void Display::drawAlprHunterFooter(Mood currentMood)
 
 void Display::drawFace(Mood currentMood, AnimState anim)
 {
-    if (!ready_) return;
+    if (!ready_)
+        return;
 
     if (anim.showAttackFace)
     {
@@ -993,7 +998,8 @@ void Display::drawFace(Mood currentMood, AnimState anim)
         drawEyesVigilant(anim, p);
     else if (currentMood == TACTICAL)
     {
-        if (drawEyesTactical(anim, p)) return;  
+        if (drawEyesTactical(anim, p))
+            return;
     }
     else if (currentMood == DRIVING)
         drawEyesDriving(p);
@@ -1060,7 +1066,8 @@ void Display::drawMusicNotes()
     {
         int x = 100 + (i * 14) - (offset * 4);
         int y = 20 - (i * 5);
-        if (x < 100) x += 42;
+        if (x < 100)
+            x += 42;
         u8g2_.drawDisc(x, y + 2, 2);
         u8g2_.drawVLine(x + 3, y - 5, 7);
         u8g2_.drawDisc(x + 7, y + 2, 2);
@@ -1107,7 +1114,7 @@ void Display::drawRadarSweep()
     int ex = cx + (int)(sin(angle) * r);
     int ey = cy - (int)(cos(angle) * r);
     u8g2_.drawLine(cx, cy, ex, ey);
-    
+
     for (int i = 1; i <= 3; i++)
     {
         float trailAngle = angle - (i * 0.3f);
@@ -1120,7 +1127,8 @@ void Display::drawRadarSweep()
 
 void Display::drawAngryAura()
 {
-    if ((millis() / 120) % 3 == 0) return;
+    if ((millis() / 120) % 3 == 0)
+        return;
     u8g2_.drawLine(25, 2, 28, 0);
     u8g2_.drawLine(50, 2, 47, 0);
     u8g2_.drawLine(78, 2, 81, 0);
@@ -1157,7 +1165,7 @@ void Display::drawRssiBars(int x, int y, int bars)
         int barHeight = 3 + (i * 2);
         int barX = x + (i * 8);
         int barTop = y + (11 - barHeight);
-        
+
         if (i < bars)
             u8g2_.drawBox(barX, barTop, 6, barHeight);
         else
@@ -1222,24 +1230,24 @@ void Display::drawSpeedometer(double speed, const char *unit, bool hasFix, int s
     u8g2_.setDrawColor(1);
     u8g2_.drawRBox(4, 2, OLED_WIDTH - 8, 48, 4);
     u8g2_.setDrawColor(0);
-    
+
     char speedBuf[8];
     if (speed < 1.0)
         snprintf(speedBuf, sizeof(speedBuf), "0");
     else
         snprintf(speedBuf, sizeof(speedBuf), "%.0f", speed);
-    
+
     u8g2_.setFont(u8g2_font_logisoso28_tn);
     int numW = u8g2_.getStrWidth(speedBuf);
     u8g2_.drawStr((OLED_WIDTH - numW) / 2, 36, speedBuf);
-    
+
     u8g2_.setFont(u8g2_font_7x14B_tr);
     int unitW = u8g2_.getStrWidth(unit);
     u8g2_.drawStr((OLED_WIDTH - unitW) / 2, 48, unit);
-    
+
     u8g2_.setDrawColor(1);
     u8g2_.setFont(u8g2_font_5x7_tr);
-    
+
     if (hasFix)
     {
         char satBuf[16];
@@ -1261,16 +1269,16 @@ void Display::drawClock(const char *time, const char *date, const char *timezone
     u8g2_.setDrawColor(1);
     u8g2_.drawRBox(4, 2, OLED_WIDTH - 8, 38, 4);
     u8g2_.setDrawColor(0);
-    
+
     u8g2_.setFont(u8g2_font_logisoso20_tr);
     int timeW = u8g2_.getStrWidth(time);
     u8g2_.drawStr((OLED_WIDTH - timeW) / 2, 32, time);
-    
+
     u8g2_.setDrawColor(1);
     u8g2_.setFont(u8g2_font_7x14B_tr);
     int dateW = u8g2_.getStrWidth(date);
     u8g2_.drawStr((OLED_WIDTH - dateW) / 2, 52, date);
-    
+
     u8g2_.setFont(u8g2_font_5x7_tr);
     u8g2_.drawStr(4, 62, timezone);
     u8g2_.drawStr(82, 62, "Hold:Back");
@@ -1280,7 +1288,8 @@ void Display::drawClock(const char *time, const char *date, const char *timezone
 
 void Display::drawDiceScreen(bool tiltMode)
 {
-    if (!ready_) return;
+    if (!ready_)
+        return;
     clear();
     diceRoller_.updateAndDraw(tiltMode);
     render();
@@ -1288,7 +1297,8 @@ void Display::drawDiceScreen(bool tiltMode)
 
 void Display::drawMagic8BallScreen(bool tiltMode)
 {
-    if (!ready_) return;
+    if (!ready_)
+        return;
     clear();
     magic8Ball_.updateAndDraw(tiltMode);
     render();
@@ -1296,7 +1306,8 @@ void Display::drawMagic8BallScreen(bool tiltMode)
 
 void Display::drawBlackjackScreen(bool tiltMode)
 {
-    if (!ready_) return;
+    if (!ready_)
+        return;
     clear();
     blackjack_.updateAndDraw(tiltMode);
     render();
@@ -1307,7 +1318,7 @@ void Display::drawMenu(const char *title, const char **items, uint8_t itemCount,
     clear();
     u8g2_.setFont(u8g2_font_6x10_tr);
     u8g2_.setDrawColor(1);
-    
+
     const int lineHeight = 12;
     const int menuTop = 15;
     int scrollOffset = (selectedIdx >= 4) ? selectedIdx - 3 : 0;
@@ -1320,10 +1331,11 @@ void Display::drawMenu(const char *title, const char **items, uint8_t itemCount,
     for (int i = 0; i < 4; i++)
     {
         int idx = i + scrollOffset;
-        if (idx >= itemCount) break;
-        
+        if (idx >= itemCount)
+            break;
+
         int boxY = menuTop + i * lineHeight;
-        
+
         if (idx == selectedIdx)
         {
             u8g2_.drawBox(2, boxY, OLED_WIDTH - 4, lineHeight);
@@ -1348,10 +1360,14 @@ void Display::drawMenu(const char *title, const char **items, uint8_t itemCount,
             int step = (millis() / 35) % cycle;
 
             int offset = 0;
-            if (step < pause)                            offset = 0;
-            else if (step < pause + overflow)            offset = step - pause;
-            else if (step < (pause * 2) + overflow)      offset = overflow;
-            else                                          offset = overflow - (step - ((pause * 2) + overflow));
+            if (step < pause)
+                offset = 0;
+            else if (step < pause + overflow)
+                offset = step - pause;
+            else if (step < (pause * 2) + overflow)
+                offset = overflow;
+            else
+                offset = overflow - (step - ((pause * 2) + overflow));
 
             u8g2_.drawStr(4 - offset, textY, items[idx]);
         }
@@ -1369,8 +1385,88 @@ void Display::drawConfirm(const char *line1, const char *line2)
     clear();
     u8g2_.setFont(u8g2_font_6x10_tr);
     u8g2_.drawStr(54, 28, "OK");
-    if (line1) drawCentered(line1, 42);
-    if (line2) drawCentered(line2, 54);
+    if (line1)
+        drawCentered(line1, 42);
+    if (line2)
+        drawCentered(line2, 54);
+    u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
+    render();
+}
+
+void Display::drawBatteryFace(int percentage, float voltage, bool isLow)
+{
+    clear();
+    
+    int leftX = 18, rightX = 53;
+    int eyeY = 18;
+    int eyeR = 6;
+    int mouthY = eyeY + 18;
+    int mouthCX = leftX + 18; 
+
+    if (percentage > 75) 
+    {
+        u8g2_.drawDisc(leftX, eyeY, eyeR);
+        u8g2_.drawDisc(rightX, eyeY, eyeR);
+        u8g2_.drawPixel(leftX - 8, eyeY - 5);
+        u8g2_.drawPixel(rightX + 8, eyeY - 5);
+        u8g2_.setDrawColor(0);
+        u8g2_.drawDisc(leftX + 2, eyeY - 1, 2);
+        u8g2_.drawDisc(rightX + 2, eyeY - 1, 2);
+        u8g2_.setDrawColor(1);
+        u8g2_.drawCircle(mouthCX, mouthY - 4, 8, U8G2_DRAW_LOWER_LEFT | U8G2_DRAW_LOWER_RIGHT);
+    }
+    else if (percentage > 25) 
+    {
+        u8g2_.drawDisc(leftX, eyeY, eyeR);
+        u8g2_.drawDisc(rightX, eyeY, eyeR);
+        u8g2_.setDrawColor(0);
+        u8g2_.drawDisc(leftX + 2, eyeY - 1, 2);
+        u8g2_.drawDisc(rightX + 2, eyeY - 1, 2);
+        u8g2_.setDrawColor(1);
+        u8g2_.drawHLine(mouthCX - 7, mouthY - 2, 14);
+    }
+    else 
+    {
+        u8g2_.drawDisc(leftX, eyeY, eyeR);
+        u8g2_.drawDisc(rightX, eyeY, eyeR);
+        u8g2_.setDrawColor(0);
+        u8g2_.drawDisc(leftX + 2, eyeY - 1, 2);
+        u8g2_.drawDisc(rightX + 2, eyeY - 1, 2);
+        u8g2_.setDrawColor(1);
+        u8g2_.drawLine(leftX - 5, eyeY - 10, leftX + 4, eyeY - 6);
+        u8g2_.drawLine(rightX + 5, eyeY - 10, rightX - 4, eyeY - 6);
+        u8g2_.drawLine(mouthCX - 10, mouthY, mouthCX - 6, mouthY - 2);
+        u8g2_.drawLine(mouthCX - 6, mouthY - 2, mouthCX, mouthY);
+        u8g2_.drawLine(mouthCX, mouthY, mouthCX + 6, mouthY - 2);
+        u8g2_.drawLine(mouthCX + 6, mouthY - 2, mouthCX + 10, mouthY);
+    }
+
+    int bx = 78, by = 15, bw = 35, bh = 20;
+    u8g2_.drawFrame(bx, by, bw, bh);
+    u8g2_.drawBox(bx + bw, by + 6, 3, 8); 
+
+    int segments = 0;
+    if (percentage > 75) segments = 4;
+    else if (percentage > 50) segments = 3;
+    else if (percentage > 25) segments = 2;
+    else if (percentage > 5)  segments = 1;
+
+    for (int i = 0; i < segments; i++) {
+        u8g2_.drawBox(bx + 2 + (i * 8), by + 2, 6, bh - 4);
+    }
+
+    u8g2_.setFont(u8g2_font_6x10_tr);
+    char buf[24];
+    if (isLow) {
+        drawCentered("LOW BATTERY!", 56);
+    } else {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Battery: %d%%  %.2fV", percentage, voltage);
+        drawCentered(buf, 56);
+    }
+    
+    
+
     u8g2_.drawRFrame(0, 0, OLED_WIDTH, OLED_HEIGHT, 6);
     render();
 }
@@ -1378,14 +1474,14 @@ void Display::drawConfirm(const char *line1, const char *line2)
 void Display::drawStatusBar(bool touched, int volume)
 {
     u8g2_.drawHLine(0, 63, OLED_WIDTH);
-    
+
     if (touched)
     {
         u8g2_.drawBox(2, 59, 8, 3);
         u8g2_.setFont(u8g2_font_4x6_tr);
         u8g2_.drawStr(12, 63, "TOUCH");
     }
-    
+
     for (int i = 0; i < 3; i++)
     {
         int h = (volume > i * 85) ? 3 : 1;

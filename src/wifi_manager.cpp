@@ -322,20 +322,20 @@ void wifiStartPortal()
     portalServer = new AsyncWebServer(80);
 
     portalServer->on("/status", HTTP_GET,
-        [](AsyncWebServerRequest *request) {
-            request->send(200, "application/json", _portalStatusJSON);
-        });
+                     [](AsyncWebServerRequest *request)
+                     {
+                         request->send(200, "application/json", _portalStatusJSON);
+                     });
 
     portalServer->on("/clear", HTTP_POST,
-        [](AsyncWebServerRequest *request) {
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-            portalShouldClear = true;
-        });
+                     [](AsyncWebServerRequest *request)
+                     {
+                         request->send(200, "application/json", "{\"status\":\"ok\"}");
+                         portalShouldClear = true;
+                     });
 
-    portalServer->on("/save", HTTP_POST, 
-        [](AsyncWebServerRequest *request) {}, 
-        NULL, 
-        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    portalServer->on("/save", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+                     {
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, (const char *)data, len);
             if (!error)
@@ -349,16 +349,17 @@ void wifiStartPortal()
             {
                 Serial.println("[Portal] JSON parse error!");
                 request->send(400, "application/json", "{\"status\":\"error\"}");
-            }
-        });
+            } });
 
     portalServer->on("/", HTTP_GET,
-        [](AsyncWebServerRequest *request) {
-            request->send(200, "text/html", PORTAL_HTML);
-        });
+                     [](AsyncWebServerRequest *request)
+                     {
+                         request->send(200, "text/html", PORTAL_HTML);
+                     });
 
     portalServer->onNotFound(
-        [](AsyncWebServerRequest *request) {
+        [](AsyncWebServerRequest *request)
+        {
             request->redirect("/");
         });
 
@@ -370,16 +371,16 @@ void wifiStopPortal()
 {
     if (!portalActive)
         return;
-    
+
     dnsServer.stop();
-    
+
     if (portalServer)
     {
         portalServer->end();
         delete portalServer;
         portalServer = nullptr;
     }
-    
+
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_OFF);
     portalActive = false;
@@ -389,7 +390,7 @@ void wifiProcessPortal()
 {
     if (!portalActive)
         return;
-    
+
     dnsServer.processNextRequest();
 
     if (portalSaveAndReboot || portalShouldClear)
@@ -440,18 +441,24 @@ float wifiTxPower()
 int wifiSignalPercent()
 {
     int32_t r = wifiRSSI();
-    if (r >= -50) return 100;
-    if (r <= -100) return 0;
+    if (r >= -50)
+        return 100;
+    if (r <= -100)
+        return 0;
     return 2 * (r + 100);
 }
 
 String wifiSignalLabel()
 {
     int32_t r = wifiRSSI();
-    if (r >= -50) return "EXCELLENT";
-    if (r >= -60) return "GOOD";
-    if (r >= -70) return "FAIR";
-    if (r >= -80) return "WEAK";
+    if (r >= -50)
+        return "EXCELLENT";
+    if (r >= -60)
+        return "GOOD";
+    if (r >= -70)
+        return "FAIR";
+    if (r >= -80)
+        return "WEAK";
     return "CRITICAL";
 }
 

@@ -27,6 +27,9 @@
   //Tilt
   #define TILT_PIN      11
 
+  #define BAT_VOLT_PIN 6
+  #define BAT_VOLT_PIN_EN 26
+
 #elif defined(BOARD_C3_MINI)
 
   //OLED

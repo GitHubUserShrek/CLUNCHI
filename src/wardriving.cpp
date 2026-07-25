@@ -6,17 +6,17 @@
 #include <SD.h>
 
 #if defined(BOARD_XIAO_C5)
-    #define WD_SCAN_INTERVAL_MS 1500
-    #define WD_MAX_NETWORKS     150
-    #define WD_SEEN_CAPACITY    4096
+#define WD_SCAN_INTERVAL_MS 1500
+#define WD_MAX_NETWORKS 150
+#define WD_SEEN_CAPACITY 4096
 #else
-    #define WD_SCAN_INTERVAL_MS 3000
-    #define WD_MAX_NETWORKS     60
-    #define WD_SEEN_CAPACITY    2048
+#define WD_SCAN_INTERVAL_MS 3000
+#define WD_MAX_NETWORKS 60
+#define WD_SEEN_CAPACITY 2048
 #endif
 
 #define WD_SEEN_EMPTY 0
-#define WD_SEEN_USED  1
+#define WD_SEEN_USED 1
 
 bool wardrivingActive = false;
 uint32_t wardrivingNetworksLogged = 0;
@@ -34,7 +34,7 @@ struct SeenEntry
 {
     uint8_t state;
     uint32_t hash;
-    char bssid[18];  
+    char bssid[18];
 };
 
 static SeenEntry *_seenTable = nullptr;
@@ -70,7 +70,8 @@ static void clearSeen()
 
 static bool allocSeen()
 {
-    if (_seenTable) return true;
+    if (_seenTable)
+        return true;
 
     _seenTable = new SeenEntry[WD_SEEN_CAPACITY];
     if (!_seenTable)
@@ -100,15 +101,17 @@ static void freeSeen()
 
 static bool alreadySeen(const char *bssid)
 {
-    if (!_seenTable) return false;
-    
+    if (!_seenTable)
+        return false;
+
     uint32_t h = fnvHash(bssid);
     uint32_t idx = h % WD_SEEN_CAPACITY;
 
     for (int probe = 0; probe < WD_SEEN_CAPACITY; probe++)
     {
         uint32_t i = (idx + probe) % WD_SEEN_CAPACITY;
-        if (_seenTable[i].state == WD_SEEN_EMPTY) return false;
+        if (_seenTable[i].state == WD_SEEN_EMPTY)
+            return false;
         if (_seenTable[i].hash == h && strcmp(_seenTable[i].bssid, bssid) == 0)
             return true;
     }
@@ -117,8 +120,10 @@ static bool alreadySeen(const char *bssid)
 
 static void markSeen(const char *bssid)
 {
-    if (!_seenTable) return;
-    if (_seenCount >= WD_SEEN_CAPACITY - 1) return;
+    if (!_seenTable)
+        return;
+    if (_seenCount >= WD_SEEN_CAPACITY - 1)
+        return;
 
     uint32_t h = fnvHash(bssid);
     uint32_t idx = h % WD_SEEN_CAPACITY;
@@ -141,9 +146,11 @@ static void markSeen(const char *bssid)
 
 static void checkAndRotateSession()
 {
-    if (!_seenTable) return;
+    if (!_seenTable)
+        return;
 
-    if (_seenCount < WD_SEEN_CAPACITY - 100) return;
+    if (_seenCount < WD_SEEN_CAPACITY - 100)
+        return;
 
     _sessionPart++;
 
@@ -157,7 +164,7 @@ static String getDateString()
 {
     LocalTime lt = gpsGetLocalTime();
     char buf[16];
-    
+
     if (lt.valid)
     {
         snprintf(buf, sizeof(buf), "%04d%02d%02d", lt.year, lt.month, lt.day);
@@ -175,18 +182,19 @@ static String getTimeString()
 {
     LocalTime lt = gpsGetLocalTime();
     char buf[16];
-    
+
     if (lt.valid)
         snprintf(buf, sizeof(buf), "%02d:%02d:%02d", lt.hour, lt.minute, lt.second);
     else
         snprintf(buf, sizeof(buf), "%02d:%02d:%02d", gpsData.hour, gpsData.minute, gpsData.second);
-    
+
     return String(buf);
 }
 
 static File openNetworkLog()
 {
-    if (!sdActive) return File();
+    if (!sdActive)
+        return File();
 
     if (!SD.exists("/wardriving"))
         SD.mkdir("/wardriving");
@@ -215,19 +223,28 @@ static File openNetworkLog()
     return f;
 }
 
-static const char* encryptionTypeString(wifi_auth_mode_t auth)
+static const char *encryptionTypeString(wifi_auth_mode_t auth)
 {
     switch (auth)
     {
-        case WIFI_AUTH_OPEN:            return "OPEN";
-        case WIFI_AUTH_WEP:             return "WEP";
-        case WIFI_AUTH_WPA_PSK:         return "WPA";
-        case WIFI_AUTH_WPA2_PSK:        return "WPA2";
-        case WIFI_AUTH_WPA_WPA2_PSK:    return "WPA/WPA2";
-        case WIFI_AUTH_WPA3_PSK:        return "WPA3";
-        case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2/WPA3";
-        case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2-ENT";
-        default:                        return "OTHER";
+    case WIFI_AUTH_OPEN:
+        return "OPEN";
+    case WIFI_AUTH_WEP:
+        return "WEP";
+    case WIFI_AUTH_WPA_PSK:
+        return "WPA";
+    case WIFI_AUTH_WPA2_PSK:
+        return "WPA2";
+    case WIFI_AUTH_WPA_WPA2_PSK:
+        return "WPA/WPA2";
+    case WIFI_AUTH_WPA3_PSK:
+        return "WPA3";
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+        return "WPA2/WPA3";
+    case WIFI_AUTH_WPA2_ENTERPRISE:
+        return "WPA2-ENT";
+    default:
+        return "OTHER";
     }
 }
 
@@ -262,7 +279,7 @@ static void logScanResults()
         String ssid = WiFi.SSID(i);
         int32_t rssi = WiFi.RSSI(i);
         uint8_t ch = WiFi.channel(i);
-        
+
         const char *band = (ch > 14) ? "5G" : "2.4G";
         if (ch > 14)
         {
@@ -314,25 +331,26 @@ static void logScanResults()
 
     if (loggedThisScan > 0)
     {
-    #if defined(BOARD_XIAO_C5)
+#if defined(BOARD_XIAO_C5)
         Serial.printf("[Wardriving] Logged %d new (%d@2.4G | %d@5G) | Total: %lu (%lu@2.4G | %lu@5G) | Table: %d/%d%s\n",
                       loggedThisScan, batch24G, batch5G,
                       (unsigned long)wardrivingNetworksLogged, _count24G, _count5G,
                       _seenCount, WD_SEEN_CAPACITY,
                       hasFile ? "" : " [NO SD]");
-    #else
+#else
         Serial.printf("[Wardriving] Logged %d new networks (total: %lu, seen: %d/%d, part: %lu)%s\n",
                       loggedThisScan, (unsigned long)wardrivingNetworksLogged,
                       _seenCount, WD_SEEN_CAPACITY,
                       (unsigned long)_sessionPart,
                       hasFile ? "" : " [SERIAL ONLY]");
-    #endif
+#endif
     }
 }
 
 static void startScan()
 {
-    if (_scanning) return;
+    if (_scanning)
+        return;
     WiFi.scanNetworks(true, false, true);
     _scanning = true;
     _lastScanTime = millis();
@@ -340,7 +358,8 @@ static void startScan()
 
 void wardrivingBegin()
 {
-    if (wardrivingActive) return;
+    if (wardrivingActive)
+        return;
 
     if (!gpsActive)
         Serial.println("[Wardriving] Warning — GPS not active.");
@@ -388,8 +407,9 @@ void wardrivingBegin()
 
 void wardrivingEnd()
 {
-    if (!wardrivingActive) return;
-    
+    if (!wardrivingActive)
+        return;
+
     wardrivingActive = false;
     WiFi.scanDelete();
     _scanning = false;
@@ -410,14 +430,16 @@ bool isWardrivingActive() { return wardrivingActive; }
 
 void wardrivingForceScan()
 {
-    if (!wardrivingActive) return;
+    if (!wardrivingActive)
+        return;
     _scanRequested = true;
     Serial.println("[Wardriving] Manual scan requested!");
 }
 
 void wardrivingUpdate()
 {
-    if (!wardrivingActive) return;
+    if (!wardrivingActive)
+        return;
 
     uint32_t now = millis();
 

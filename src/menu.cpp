@@ -55,8 +55,7 @@ static const TimerOption sleepTimerOpts[] = {
     {"5 Minutes", 300},
     {"15 Minutes", 900},
     {"30 Minutes", 1800},
-    {"Never", 0}
-};
+    {"Never", 0}};
 
 struct MenuItem
 {
@@ -111,6 +110,7 @@ static void act_sleep_timer();
 static void act_timezone();
 static void act_dst_toggle();
 static void act_tilt_toggle();
+static void act_battery();
 
 static void drawWifiScanScreen();
 static void drawWifiConnectScreen();
@@ -135,11 +135,10 @@ static const MenuItem mainOpts[] = {
     {"GPS", act_gps},
     {"Games", act_games},
     {"Settings", act_settings},
-    {"Exit", act_exit}
-};
+    {"Exit", act_exit}};
 
 static const char *settItems[] = {"Volume", "Sleep Timer", "Clock", "Timezone",
-                                    "DST On/Off", "Tilt Sensor", "Reboot", "Back"};
+                                  "DST On/Off", "Tilt Sensor", "Battery", "Reboot", "Back"};
 static const MenuItem settOpts[] = {
     {"Volume", act_volume},
     {"Sleep Timer", act_sleep_timer},
@@ -147,22 +146,21 @@ static const MenuItem settOpts[] = {
     {"Timezone", act_timezone},
     {"DST On/Off", act_dst_toggle},
     {"Tilt Sensor", act_tilt_toggle},
+    {"Battery", act_battery},
     {"Reboot", act_reboot},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 
 static const char *volItems[] = {"Vol +", "Vol -", "Mute/Unmute", "Back"};
 static const MenuItem volOpts[] = {
     {"Vol +", act_vol_up},
     {"Vol -", act_vol_down},
     {"Mute/Unmute", act_mute},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 
 #if defined(BOARD_XIAO_C5)
 static const char *wifiItems[] = {"Scan", "Connect", "Disconnect", "Net Info",
-                                    "Setup Portal", "Clear Saved", "Wardriving",
-                                    "ALPR Hunter", "Back"};
+                                  "Setup Portal", "Clear Saved", "Wardriving",
+                                  "ALPR Hunter", "Back"};
 static const MenuItem wifiOpts[] = {
     {"Scan", act_wifi_scan},
     {"Connect", act_wifi_connect},
@@ -172,13 +170,12 @@ static const MenuItem wifiOpts[] = {
     {"Clear Saved", act_wifi_clear_nvs},
     {"Wardriving", act_wardriving},
     {"ALPR Hunter", act_alpr_hunter},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 static const int WIFI_MENU_SIZE = 9;
 #else
 static const char *wifiItems[] = {"Scan", "Connect", "Disconnect", "Net Info",
-                                    "Setup Portal", "Clear Saved", "Wardriving",
-                                    "Back"};
+                                  "Setup Portal", "Clear Saved", "Wardriving",
+                                  "Back"};
 static const MenuItem wifiOpts[] = {
     {"Scan", act_wifi_scan},
     {"Connect", act_wifi_connect},
@@ -187,8 +184,7 @@ static const MenuItem wifiOpts[] = {
     {"Setup Portal", act_wifi_portal},
     {"Clear Saved", act_wifi_clear_nvs},
     {"Wardriving", act_wardriving},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 static const int WIFI_MENU_SIZE = 8;
 #endif
 
@@ -197,8 +193,7 @@ static const MenuItem bleOpts[] = {
     {"Scan", act_ble_scan},
     {"Radar", act_ble_radar},
     {"Find Device", act_ble_finder},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 
 static const char *gpsItems[] = {"Status", "Speedometer", "Satellites", "Start/Stop", "Back"};
 static const MenuItem gpsOpts[] = {
@@ -206,8 +201,7 @@ static const MenuItem gpsOpts[] = {
     {"Speedometer", act_gps_speed},
     {"Satellites", act_gps_sat_info},
     {"Start/Stop", act_gps_toggle},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 static const int GPS_MENU_SIZE = 5;
 
 static const char *gamesItems[] = {"Dice Roller", "Magic 8-Ball", "Blackjack", "Back"};
@@ -215,8 +209,7 @@ static const MenuItem gamesOpts[] = {
     {"Dice Roller", act_dice},
     {"Magic 8-Ball", act_magic_8ball},
     {"Blackjack", act_blackjack},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 static const int GAMES_MENU_SIZE = 4;
 
 static const char *finderItems[] = {"Scan", "Select", "Track", "Back"};
@@ -224,8 +217,7 @@ static const MenuItem finderOpts[] = {
     {"Scan", act_finder_scan},
     {"Select", act_finder_select},
     {"Track", act_finder_track},
-    {"Back", act_back}
-};
+    {"Back", act_back}};
 static const int FINDER_MENU_SIZE = 4;
 
 void menuBegin() { currentMenu = MENU_OFF; }
@@ -331,7 +323,8 @@ static void act_games()
 
 static void act_gps()
 {
-    if (!gpsActive) gpsBegin();
+    if (!gpsActive)
+        gpsBegin();
     currentMenu = MENU_GPS;
     menuCursor = 0;
     gpsMenuCursor = 0;
@@ -355,7 +348,8 @@ static void act_gps_speed()
 
 static void act_gps_clock()
 {
-    if (!gpsActive) gpsBegin();
+    if (!gpsActive)
+        gpsBegin();
     currentMenu = MENU_GPS_CLOCK;
     menuLongHandled = true;
 }
@@ -405,7 +399,8 @@ static void act_vol_down()
 static void act_mute()
 {
     audio.toggleMute();
-    if (!audio.isMuted()) audio.beep(440, 20);
+    if (!audio.isMuted())
+        audio.beep(440, 20);
     audio.saveSettings();
 }
 
@@ -500,7 +495,7 @@ static void act_ble_scan()
     delay(100);
     if (isBleInitialised())
     {
-        bleReset(); 
+        bleReset();
         bleCount = 0;
         bleMenuCursor = 0;
         bleStartScan();
@@ -648,6 +643,14 @@ static void act_tilt_toggle()
     audio.beep(1000, 30);
 }
 
+static void act_battery()
+{
+    exitMenu(); 
+#if defined(BOARD_XIAO_C5)
+    forceSetMood(BATTERY_STATUS);
+#endif
+}
+
 static void drawGpsStatusScreen()
 {
     if (!gpsActive)
@@ -656,10 +659,10 @@ static void drawGpsStatusScreen()
         display.drawMenu("GPS STATUS", itm, 2, -1);
         return;
     }
-    
+
     char l1[32], l2[32], l3[32], l4[32];
     snprintf(l1, 31, "%s  Sats:%d", gpsData.valid ? "LOCKED" : "SEARCHING", gpsData.satellites);
-    
+
     if (gpsData.valid)
     {
         snprintf(l2, 31, "%.5f", gpsData.latitude);
@@ -672,7 +675,7 @@ static void drawGpsStatusScreen()
         snprintf(l3, 31, "Lon: ---");
         snprintf(l4, 31, "HDOP: %.1f", gpsData.hdop / 10.0f);
     }
-    
+
     const char *itm[] = {l1, l2, l3, l4, "Hold: Back"};
     display.drawMenu("GPS STATUS", itm, 5, -1);
 }
@@ -681,8 +684,10 @@ static void drawGpsSpeedScreen()
 {
     static const char *unitLabels[] = {"km/h", "mph", "kts"};
     double speed = gpsData.speed;
-    if (gpsSpeedUnit == 1) speed *= 0.621371;
-    if (gpsSpeedUnit == 2) speed *= 0.539957;
+    if (gpsSpeedUnit == 1)
+        speed *= 0.621371;
+    if (gpsSpeedUnit == 2)
+        speed *= 0.539957;
     display.drawSpeedometer(speed, unitLabels[gpsSpeedUnit], gpsData.valid, gpsData.satellites);
 }
 
@@ -694,7 +699,7 @@ static void drawGpsClockScreen()
         display.drawMenu("GPS CLOCK", itm, 2, -1);
         return;
     }
-    
+
     LocalTime lt = gpsGetLocalTime();
     if (!lt.valid)
     {
@@ -702,21 +707,21 @@ static void drawGpsClockScreen()
         display.drawMenu("GPS CLOCK", itm, 3, -1);
         return;
     }
-    
+
     char timeBuf[16];
     snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", lt.hour, lt.minute, lt.second);
-    
+
     char dateBuf[24];
     static const char *months[] = {"", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     if (lt.month >= 1 && lt.month <= 12)
         snprintf(dateBuf, sizeof(dateBuf), "%s %d, %d", months[lt.month], lt.day, lt.year);
     else
         snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d/%04d", lt.month, lt.day, lt.year);
-    
+
     char tzBuf[16];
     snprintf(tzBuf, sizeof(tzBuf), "%s%s", timezones[deviceTimezone].label, deviceDST ? "+DST" : "");
-    
+
     display.drawClock(timeBuf, dateBuf, tzBuf);
 }
 
@@ -755,8 +760,10 @@ static void drawGpsSatInfoScreen()
     int satPages = (satCount + 1) / 2;
     int totalPages = 1 + satPages;
 
-    if (gpsSatPage >= totalPages) gpsSatPage = totalPages - 1;
-    if (gpsSatPage < 0) gpsSatPage = 0;
+    if (gpsSatPage >= totalPages)
+        gpsSatPage = totalPages - 1;
+    if (gpsSatPage < 0)
+        gpsSatPage = 0;
 
     char title[16];
     snprintf(title, 15, "SATS %d/%d", gpsSatPage + 1, totalPages);
@@ -765,12 +772,18 @@ static void drawGpsSatInfoScreen()
     {
         float h = gpsData.hdop / 10.0f;
         const char *quality;
-        if (h < 1.0f)       quality = "Ideal";
-        else if (h < 2.0f)  quality = "Excellent";
-        else if (h < 5.0f)  quality = "Good";
-        else if (h < 10.0f) quality = "Moderate";
-        else if (h < 20.0f) quality = "Fair";
-        else                quality = "Poor";
+        if (h < 1.0f)
+            quality = "Ideal";
+        else if (h < 2.0f)
+            quality = "Excellent";
+        else if (h < 5.0f)
+            quality = "Good";
+        else if (h < 10.0f)
+            quality = "Moderate";
+        else if (h < 20.0f)
+            quality = "Fair";
+        else
+            quality = "Poor";
 
         snprintf(l1, 31, "Visible: %d  Trk: %d", satCount, gpsData.satsTracked);
         snprintf(l2, 31, "Fix sats: %d", gpsData.satellites);
@@ -792,7 +805,7 @@ static void drawGpsSatInfoScreen()
     SatInfo &s1 = gpsData.sats[startIdx];
     snprintf(l1, 31, "#%d %s EL:%d AZ:%d",
              s1.prn, gpsConstellation(s1.prn), s1.elevation, s1.azimuth);
-    
+
     char bar[17];
     formatSnrBar(bar, s1.snr);
     snprintf(l2, 31, "SNR:%2d %s", s1.snr, bar);
@@ -803,7 +816,7 @@ static void drawGpsSatInfoScreen()
         SatInfo &s2 = gpsData.sats[startIdx + 1];
         snprintf(l3, 31, "#%d %s EL:%d AZ:%d",
                  s2.prn, gpsConstellation(s2.prn), s2.elevation, s2.azimuth);
-        
+
         char bar2[17];
         formatSnrBar(bar2, s2.snr);
         snprintf(l4, 31, "SNR:%2d %s", s2.snr, bar2);
@@ -819,7 +832,7 @@ static void drawWifiInfoScreen()
     static char l1[32], l2[32], l3[32], l4[32];
     char title[16];
     snprintf(title, 15, "NET %d/%d", wifiInfoPage + 1, WIFI_INFO_PAGES);
-    
+
     switch (wifiInfoPage)
     {
     case 0:
@@ -850,11 +863,12 @@ static void drawWifiInfoScreen()
         l4[0] = '\0';
         break;
     }
-    
+
     const char *itm[] = {l1, l2, l3, l4};
     int count = 0;
     for (int i = 0; i < 4; i++)
-        if (itm[i][0] != '\0') count++;
+        if (itm[i][0] != '\0')
+            count++;
     display.drawMenu(title, itm, count, -1);
 }
 
@@ -872,14 +886,14 @@ static void drawWifiScanScreen()
         display.drawMenu("WIFI SCAN", itm, 2, -1);
         return;
     }
-    
+
     if (scanCount == 0)
     {
         const char *itm[] = {"No networks", "Hold: Back"};
         display.drawMenu("WIFI SCAN", itm, 2, -1);
         return;
     }
-    
+
     char l1[64], l2[64], l3[64];
     snprintf(l1, sizeof(l1), "%d/%d: %s", wifiMenuCursor + 1, scanCount,
              scanResults[wifiMenuCursor].ssid.c_str());
@@ -914,14 +928,14 @@ static void drawWifiConnectScreen()
         }
         return;
     }
-    
+
     if (scanCount == 0)
     {
         const char *itm[] = {"Scanning..."};
         display.drawMenu("WIFI", itm, 1, -1);
         return;
     }
-    
+
     static char apLines[20][32];
     static const char *apPtrs[20];
     for (int i = 0; i < scanCount; i++)
@@ -954,27 +968,30 @@ static void drawBleScanScreen()
         display.drawMenu("BLE SCAN", itm, 3, -1);
         return;
     }
-    
+
     if (scanFinished && bleCount == 0)
     {
         const char *itm[] = {"No devices", "Hold: Back"};
         display.drawMenu("BLE SCAN", itm, 2, -1);
         return;
     }
-    
+
     int idx[40];
     bleGetSortedIndices(idx, bleCount);
     int sortedIdx = idx[bleMenuCursor];
     const BLEResult &r = bleResults[sortedIdx];
-    
+
     char title[32];
     char l1[64], l2[64], l3[64], l4[64];
-    
+
     String primary;
-    if (!r.name.isEmpty())          primary = r.name;
-    else if (!r.deviceType.isEmpty()) primary = r.deviceType;
-    else                             primary = "Unknown Device";
-    
+    if (!r.name.isEmpty())
+        primary = r.name;
+    else if (!r.deviceType.isEmpty())
+        primary = r.deviceType;
+    else
+        primary = "Unknown Device";
+
     String manufacturer = r.manufacturer.isEmpty() ? "Unknown" : r.manufacturer;
     const char *addrType = r.isPublicAddr ? "Public" : "Private";
 
@@ -1002,7 +1019,7 @@ static void drawFinderScanScreen()
         display.drawMenu("SCANNING", itm, 3, -1);
         return;
     }
-    
+
     char l1[32];
     snprintf(l1, sizeof(l1), "Found %d devices", bleCount);
     const char *itm[] = {l1, "Scan complete", "Hold: Back"};
@@ -1044,7 +1061,8 @@ static void drawFinderTrackScreen()
     display.drawCentered("TRACKING", 10);
 
     String tail = targetTrackerMac;
-    if (tail.length() > 8) tail = tail.substring(tail.length() - 8);
+    if (tail.length() > 8)
+        tail = tail.substring(tail.length() - 8);
     display.drawCentered(tail.c_str(), 20);
 
     char rssiBuf[24];
@@ -1065,13 +1083,20 @@ static void drawFinderTrackScreen()
     display.drawRssiBars(45, 40, bars);
 
     const char *distStr;
-    if (bars == 5)                        distStr = "VERY CLOSE!";
-    else if (bars == 4)                   distStr = "Close";
-    else if (bars == 3)                   distStr = "Nearby";
-    else if (bars == 2)                   distStr = "Far";
-    else if (bars == 1)                   distStr = "Very Far";
-    else if (targetTrackerLastSeen == 0)  distStr = "Waiting...";
-    else                                   distStr = "Out of Range";
+    if (bars == 5)
+        distStr = "VERY CLOSE!";
+    else if (bars == 4)
+        distStr = "Close";
+    else if (bars == 3)
+        distStr = "Nearby";
+    else if (bars == 2)
+        distStr = "Far";
+    else if (bars == 1)
+        distStr = "Very Far";
+    else if (targetTrackerLastSeen == 0)
+        distStr = "Waiting...";
+    else
+        distStr = "Out of Range";
     display.drawCentered(distStr, 60);
 
     display.render();
@@ -1089,21 +1114,21 @@ static void drawTimezoneScreen()
     char l1[32], l2[32], l3[32];
     int offHours = tz.offset / 60;
     int offMins = abs(tz.offset) % 60;
-    
+
     snprintf(l1, 31, "%s", tz.label);
-    
+
     if (offMins != 0)
         snprintf(l2, 31, "UTC%+d:%02d", offHours, offMins);
     else if (tz.offset == 0)
         snprintf(l2, 31, "UTC");
     else
         snprintf(l2, 31, "UTC%+d", offHours);
-    
+
     if (settTimezone == deviceTimezone)
         snprintf(l3, 31, "[ACTIVE]");
     else
         snprintf(l3, 31, "Hold: Select");
-    
+
     char title[16];
     snprintf(title, 15, "TZ %d/%d", settTimezone + 1, timezoneCount);
     const char *itm[] = {l1, l2, l3, "Tap:Next Hold:Set"};
@@ -1129,7 +1154,7 @@ static bool handleGameTaps(GameTapState &state)
         state.lastTap = millis();
         audio.beep(400, 15);
     }
-    
+
     return (state.taps > 0 && !isTouched && millis() - state.lastTap > 350);
 }
 
@@ -1148,10 +1173,13 @@ static bool handleGameBack(int returnCursor)
 
 void menuUpdate()
 {
-    if (!isMenuActive()) return;
-    if (!isTouched) menuLongHandled = false;
+    if (!isMenuActive())
+        return;
+    if (!isTouched)
+        menuLongHandled = false;
 
-    if (gpsActive) gpsUpdate();
+    if (gpsActive)
+        gpsUpdate();
 
     if (currentMenu == MENU_CONFIRM)
     {
@@ -1181,13 +1209,13 @@ void menuUpdate()
     if (currentMenu == MENU_BLE_SCAN)
     {
         bleUpdate();
-        
+
         if (touchJustReleased && !touchWasLongPress && bleCount > 0)
         {
             bleMenuCursor = (bleMenuCursor + 1) % bleCount;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
@@ -1197,7 +1225,7 @@ void menuUpdate()
             menuCursor = 0;
             audio.beep(900, 50);
         }
-        
+
         drawBleScanScreen();
         return;
     }
@@ -1209,7 +1237,8 @@ void menuUpdate()
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
-            if (bleScanActive) bleStopScan();
+            if (bleScanActive)
+                bleStopScan();
             currentMenu = MENU_BLE_FINDER;
             menuCursor = 0;
             audio.beep(900, 50);
@@ -1259,21 +1288,22 @@ void menuUpdate()
     if (currentMenu == MENU_WIFI && wifiMenuScanning)
     {
         wifiUpdate();
-        
+
         if (touchJustReleased && !touchWasLongPress && !scanActive && scanCount > 0)
         {
             wifiMenuCursor = (wifiMenuCursor + 1) % scanCount;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
             wifiMenuScanning = false;
-            if (scanActive) wifiCancelScan();
+            if (scanActive)
+                wifiCancelScan();
             audio.beep(900, 50);
         }
-        
+
         drawWifiScanScreen();
         return;
     }
@@ -1282,7 +1312,7 @@ void menuUpdate()
     {
         wifiUpdate();
         wifiMenuScanning = false;
-        
+
         if (connectInProgress)
         {
             if (longTouchActive && !menuLongHandled)
@@ -1318,7 +1348,7 @@ void menuUpdate()
                 audio.beep(1000, 30);
             }
         }
-        
+
         drawWifiConnectScreen();
         return;
     }
@@ -1331,13 +1361,13 @@ void menuUpdate()
             menuCursor = 2;
             return;
         }
-        
+
         if (touchJustReleased && !touchWasLongPress)
         {
             wifiInfoPage = (wifiInfoPage + 1) % WIFI_INFO_PAGES;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
@@ -1345,7 +1375,7 @@ void menuUpdate()
             menuCursor = 2;
             audio.beep(900, 50);
         }
-        
+
         drawWifiInfoScreen();
         return;
     }
@@ -1357,7 +1387,7 @@ void menuUpdate()
             sleepTimerCursor = (sleepTimerCursor + 1) % 6;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
@@ -1374,7 +1404,7 @@ void menuUpdate()
                 currentMenu = MENU_SETTINGS;
             }
         }
-        
+
         drawSleepTimerScreen();
         return;
     }
@@ -1386,7 +1416,7 @@ void menuUpdate()
             settTimezone = (settTimezone + 1) % timezoneCount;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
@@ -1395,7 +1425,7 @@ void menuUpdate()
             showConfirm("Timezone Set", timezones[deviceTimezone].label, MENU_SETTINGS);
             audio.beep(1200, 40);
         }
-        
+
         drawTimezoneScreen();
         return;
     }
@@ -1420,7 +1450,7 @@ void menuUpdate()
             gpsSpeedUnit = (gpsSpeedUnit + 1) % 3;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
@@ -1433,7 +1463,7 @@ void menuUpdate()
             else if (returnMenuFromSpeed == MENU_OFF)
                 resumeWardrivingView();
         }
-        
+
         drawGpsSpeedScreen();
         return;
     }
@@ -1460,7 +1490,7 @@ void menuUpdate()
             gpsSatPage = (gpsSatPage + 1) % totalPages;
             audio.beep(600, 20);
         }
-        
+
         if (longTouchActive && !menuLongHandled)
         {
             menuLongHandled = true;
@@ -1468,7 +1498,7 @@ void menuUpdate()
             menuCursor = gpsMenuCursor;
             audio.beep(900, 50);
         }
-        
+
         drawGpsSatInfoScreen();
         return;
     }
@@ -1476,7 +1506,7 @@ void menuUpdate()
     if (currentMenu == MENU_DICE)
     {
         static GameTapState diceState = {0, 0};
-        
+
         if (!display.diceIsRolling())
         {
             if (handleGameTaps(diceState))
@@ -1487,13 +1517,13 @@ void menuUpdate()
                     display.diceNext();
                 diceState.taps = 0;
             }
-            
+
             if (tiltEnabled() && tiltSingleHit())
             {
                 display.diceRoll();
                 diceState.taps = 0;
             }
-            
+
             if (handleGameBack(0))
             {
                 diceState.taps = 0;
@@ -1507,21 +1537,22 @@ void menuUpdate()
     if (currentMenu == MENU_MAGIC_8BALL)
     {
         static GameTapState m8bState = {0, 0};
-        
+
         if (!display.m8bIsShaking())
         {
             if (handleGameTaps(m8bState))
             {
-                if (m8bState.taps >= 2) display.m8bAsk();
+                if (m8bState.taps >= 2)
+                    display.m8bAsk();
                 m8bState.taps = 0;
             }
-            
+
             if (tiltEnabled() && tiltSingleHit())
             {
                 display.m8bAsk();
                 m8bState.taps = 0;
             }
-            
+
             if (handleGameBack(1))
             {
                 m8bState.taps = 0;
@@ -1563,28 +1594,52 @@ void menuUpdate()
     switch (currentMenu)
     {
     case MENU_MAIN:
-        items = mainItems; opts = mainOpts; size = 6; title = "MENU";
+        items = mainItems;
+        opts = mainOpts;
+        size = 6;
+        title = "MENU";
         break;
     case MENU_SETTINGS:
-        items = settItems; opts = settOpts; size = 8; title = "SETTINGS";
+        items = settItems;
+        opts = settOpts;
+        size = 9;
+        title = "SETTINGS";
         break;
     case MENU_WIFI:
-        items = wifiItems; opts = wifiOpts; size = WIFI_MENU_SIZE; title = "WIFI";
+        items = wifiItems;
+        opts = wifiOpts;
+        size = WIFI_MENU_SIZE;
+        title = "WIFI";
         break;
     case MENU_BLE:
-        items = bleItems; opts = bleOpts; size = 4; title = "BLE";
+        items = bleItems;
+        opts = bleOpts;
+        size = 4;
+        title = "BLE";
         break;
     case MENU_BLE_FINDER:
-        items = finderItems; opts = finderOpts; size = FINDER_MENU_SIZE; title = "FIND DEVICE";
+        items = finderItems;
+        opts = finderOpts;
+        size = FINDER_MENU_SIZE;
+        title = "FIND DEVICE";
         break;
     case MENU_VOLUME:
-        items = volItems; opts = volOpts; size = 4; title = "VOLUME";
+        items = volItems;
+        opts = volOpts;
+        size = 4;
+        title = "VOLUME";
         break;
     case MENU_GPS:
-        items = gpsItems; opts = gpsOpts; size = GPS_MENU_SIZE; title = "GPS";
+        items = gpsItems;
+        opts = gpsOpts;
+        size = GPS_MENU_SIZE;
+        title = "GPS";
         break;
     case MENU_GAMES:
-        items = gamesItems; opts = gamesOpts; size = GAMES_MENU_SIZE; title = "GAMES";
+        items = gamesItems;
+        opts = gamesOpts;
+        size = GAMES_MENU_SIZE;
+        title = "GAMES";
         break;
     default:
         return;
@@ -1595,14 +1650,15 @@ void menuUpdate()
         menuLongHandled = false;
         audio.beep(400, 15);
     }
-    
+
     if (touchJustReleased && !touchWasLongPress)
     {
         menuCursor = (menuCursor + 1) % size;
-        if (currentMenu == MENU_GPS) gpsMenuCursor = menuCursor;
+        if (currentMenu == MENU_GPS)
+            gpsMenuCursor = menuCursor;
         audio.beep(600, 20);
     }
-    
+
     if (longTouchActive && !menuLongHandled)
     {
         menuLongHandled = true;

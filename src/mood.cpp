@@ -26,7 +26,6 @@ static bool _wasNetDown = false;
 static bool _radarActive = false;
 static bool _wardrivingActive = false;
 
-
 static bool _radarTouchLock = true;
 static bool _wardrivingTouchLock = true;
 
@@ -40,7 +39,9 @@ static bool _alprActive = false;
 static bool _alprTouchLock = true;
 static uint32_t _lastAlprAlertTime = 0;
 #endif
-
+#if defined(BOARD_XIAO_C5)
+static bool _batteryTouchLock = true; 
+#endif
 
 bool isRadarActive() { return _radarActive; }
 bool isWardrivingMoodActive() { return _wardrivingActive; }
@@ -53,22 +54,36 @@ const char *moodName(Mood m)
 {
     switch (m)
     {
-    case NEUTRAL:      return "NEUTRAL";
-    case HAPPY:        return "HAPPY";
-    case SLEEPY:       return "SLEEPY";
-    case ANNOYED:      return "ANNOYED";
-    case CURIOUS:      return "CURIOUS";
-    case JAZZED:       return "JAZZED";
-    case VIGILANT:     return "VIGILANT";
-    case ENRAGED:      return "ENRAGED";
-    case DEAD:         return "DEAD";
-    case DRIVING:      return "DRIVING";
-    case TACTICAL:     return "TACTICAL";
+    case NEUTRAL:
+        return "NEUTRAL";
+    case HAPPY:
+        return "HAPPY";
+    case SLEEPY:
+        return "SLEEPY";
+    case ANNOYED:
+        return "ANNOYED";
+    case CURIOUS:
+        return "CURIOUS";
+    case JAZZED:
+        return "JAZZED";
+    case VIGILANT:
+        return "VIGILANT";
+    case ENRAGED:
+        return "ENRAGED";
+    case DEAD:
+        return "DEAD";
+    case DRIVING:
+        return "DRIVING";
+    case TACTICAL:
+        return "TACTICAL";
 #if defined(BOARD_XIAO_C5)
-    case HUNTING:      return "HUNTING";
-    case ALERT_CAMERA: return "ALERT_CAMERA";
+    case HUNTING:
+        return "HUNTING";
+    case ALERT_CAMERA:
+        return "ALERT_CAMERA";
 #endif
-    default:           return "???";
+    default:
+        return "???";
     }
 }
 
@@ -87,6 +102,17 @@ static void _setMood(Mood m)
         animation.onMoodChange();
     mood = m;
     moodChangeTime = millis();
+}
+
+void forceSetMood(Mood m) {
+    _setMood(m);
+    lastInteraction = millis();
+    
+#if defined(BOARD_XIAO_C5)
+    if (m == BATTERY_STATUS) {
+        _batteryTouchLock = true; 
+    }
+#endif
 }
 
 static void _reactJazzed()
@@ -342,28 +368,28 @@ static void _updateWardriving(uint32_t now)
 {
     if (!isTouched)
         _wardrivingTouchLock = false;
-    
+
     if (longTouchActive && !_wardrivingTouchLock)
     {
         exitWardriving();
         return;
     }
-    
+
     static uint32_t lastWardrivingTap = 0;
     static bool waitingForSecondTap = false;
     const uint32_t DOUBLE_TAP_WINDOW_MS = 400;
-    
+
     if (touchJustReleased && !touchWasLongPress)
     {
         if (waitingForSecondTap && (now - lastWardrivingTap) < DOUBLE_TAP_WINDOW_MS)
         {
             waitingForSecondTap = false;
-            
+
             Serial.println("[Mood] Wardriving double-tap → Speedometer");
             audio.beep(800, 30);
             delay(50);
             audio.beep(1000, 30);
-            
+
             openSpeedometerFromWardriving();
         }
         else
@@ -372,7 +398,7 @@ static void _updateWardriving(uint32_t now)
             lastWardrivingTap = now;
         }
     }
-    
+
     if (waitingForSecondTap && (now - lastWardrivingTap) > DOUBLE_TAP_WINDOW_MS)
     {
         waitingForSecondTap = false;
@@ -391,13 +417,14 @@ void triggerAlprHunter()
     _alprActive = true;
     _alprTouchLock = true;
     _lastAlprAlertTime = 0;
-    
-    if (wardrivingActive) {
+
+    if (wardrivingActive)
+    {
         wardrivingEnd();
     }
-    
+
     alprDetectorBegin();
-    
+
     _setMood(HUNTING);
     lastInteraction = millis();
     Serial.println("[Mood] === ALPR HUNTER MODE ACTIVATED ===");
@@ -410,13 +437,14 @@ void triggerAlprHunter()
 
 void exitAlprHunter()
 {
-    if (!_alprActive) return;
-    
+    if (!_alprActive)
+        return;
+
     _alprActive = false;
     alprDetectorEnd();
     bleForceResync();
-      bleReset(); 
-    
+    bleReset();
+
     _setMood(baseMood());
     lastInteraction = millis();
     Serial.println("[Mood] === ALPR HUNTER MODE DEACTIVATED ===");
@@ -434,29 +462,30 @@ void resumeAlprHunterView()
 static void _updateAlprHunter(uint32_t now)
 {
     const uint32_t ALPR_ALERT_CLEAR_MS = 4000;
-    
-    if (gpsActive) {
+
+    if (gpsActive)
+    {
         gpsUpdate();
     }
-    
+
     if (!isTouched)
         _alprTouchLock = false;
-    
+
     if (longTouchActive && !_alprTouchLock)
     {
         exitAlprHunter();
         return;
     }
-    
+
     if (alprJustDetected)
     {
         alprJustDetected = false;
         _lastAlprAlertTime = now;
-        
+
         if (mood != ALERT_CAMERA)
         {
             _setMood(ALERT_CAMERA);
-            Serial.printf("[Mood] !!! %s %s DETECTED: %s @ RSSI %d\n", 
+            Serial.printf("[Mood] !!! %s %s DETECTED: %s @ RSSI %d\n",
                           alprVendorName(alprLastVendor),
                           alprDeviceTypeName(alprLastType),
                           alprLastMAC, (int)alprLastRSSI);
@@ -467,14 +496,14 @@ static void _updateAlprHunter(uint32_t now)
             audio.beep(2000, 40);
         }
     }
-    
+
     if (mood == ALERT_CAMERA && (now - _lastAlprAlertTime > ALPR_ALERT_CLEAR_MS))
     {
         _setMood(HUNTING);
         Serial.println("[Mood] Back to hunting...");
     }
 }
-#endif 
+#endif
 
 static void _updateNetworkState(uint32_t now, bool connected)
 {
@@ -548,7 +577,7 @@ static void _updateMoodDecay(uint32_t now, bool connected)
         Serial.println("[Mood] HonkShoo mimimi");
         return;
     }
-    
+
     if (isTouched && mood == DEAD)
     {
         _setMood(NEUTRAL);
@@ -639,10 +668,24 @@ void moodUpdate(TouchEvent event)
 {
     if (wifiIsPortalActive())
         return;
-    
+
     uint32_t now = millis();
     bool connected = wifiConnected();
-    
+
+#if defined(BOARD_XIAO_C5)
+    if (mood == BATTERY_STATUS) {
+        if (!isTouched) {
+            _batteryTouchLock = false;
+        }
+        
+        if (longTouchActive && !_batteryTouchLock) {
+            _setMood(baseMood());
+            lastInteraction = now;
+        }
+        return; 
+    }
+#endif
+
     if (touchJustPressed)
     {
         lastInteraction = now;
@@ -653,7 +696,7 @@ void moodUpdate(TouchEvent event)
             animation.triggerBlink();
         }
     }
-    
+
     if (_radarActive)
     {
         _updateRadar(now);
@@ -671,7 +714,7 @@ void moodUpdate(TouchEvent event)
         return;
     }
 #endif
-    
+
     if (!isMenuActive())
     {
         _handleTouchEvent(event, now);

@@ -234,12 +234,11 @@ static void _recalcStats()
 
     Serial.printf("[NetHealth DEBUG] History has %d entries:\n", nhHistoryCount);
     uint8_t debugN = 0;
-    _forEachEntry([&](const PingEntry &e) {
-        Serial.printf("  [%d] target=%d success=%d latency=%lums age=%lums\n",
-                      debugN++, e.targetIdx, e.success, 
-                      (unsigned long)e.latencyMs,
-                      (unsigned long)(millis() - e.timestamp));
-    });
+    _forEachEntry([&](const PingEntry &e)
+                  { Serial.printf("  [%d] target=%d success=%d latency=%lums age=%lums\n",
+                                  debugN++, e.targetIdx, e.success,
+                                  (unsigned long)e.latencyMs,
+                                  (unsigned long)(millis() - e.timestamp)); });
 }
 
 static void _sendProbe()
@@ -265,7 +264,7 @@ void netHealthBegin()
     _lastRoundMs = millis() - NH_CHECK_INTERVAL_MS + 5000;
     _currentTarget = 0;
     _betterCount = 0;
-    _probesThisRound = 0; 
+    _probesThisRound = 0;
     netHealthIsUp = true;
     netHealthConsecutiveFails = 0;
     Serial.println("[NetHealth] Monitor started (UDP DNS).");
@@ -321,7 +320,7 @@ void netHealthUpdate()
         if (now - _lastRoundMs >= NH_CHECK_INTERVAL_MS)
         {
             _lastRoundMs = now;
-            _currentTarget = random(NH_TARGET_COUNT); 
+            _currentTarget = random(NH_TARGET_COUNT);
             _state = ProbeState::SENDING;
         }
         break;
@@ -364,11 +363,11 @@ void netHealthUpdate()
 
         if (packetSize > 0)
         {
-            uint8_t buf[16]; 
+            uint8_t buf[16];
             int rd = _udp.read(buf, sizeof(buf));
             if (rd >= 4 &&
-                buf[0] == 0x00 && buf[1] == 0x01 && 
-                (buf[2] & 0x80))                   
+                buf[0] == 0x00 && buf[1] == 0x01 &&
+                (buf[2] & 0x80))
             {
                 uint8_t rcode = buf[3] & 0x0F;
                 if (rcode == 0 || rcode == 3)
@@ -387,9 +386,8 @@ void netHealthUpdate()
         _udp.stop();
         _pushEntry(latencyMs, success, _currentTarget);
 
-
-Serial.printf("[NetHealth DEBUG] Pushed: latency=%lums success=%d target=%d\n",
-              (unsigned long)latencyMs, success, _currentTarget);
+        Serial.printf("[NetHealth DEBUG] Pushed: latency=%lums success=%d target=%d\n",
+                      (unsigned long)latencyMs, success, _currentTarget);
 
         Serial.printf("[NetHealth] %s → %s (%lums)\n",
                       TARGETS[_currentTarget].label,
@@ -399,7 +397,6 @@ Serial.printf("[NetHealth DEBUG] Pushed: latency=%lums success=%d target=%d\n",
         _state = ProbeState::NEXT_TARGET;
         break;
     }
-
 
     case ProbeState::DONE:
         _recalcStats();

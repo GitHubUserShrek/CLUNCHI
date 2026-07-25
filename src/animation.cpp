@@ -108,7 +108,7 @@ void Animation::update(Mood currentMood)
 #if defined(BOARD_XIAO_C5)
         || currentMood == HUNTING
 #endif
-        )
+    )
     {
         blinkMin = 8000;
         blinkMax = 15000;
@@ -117,7 +117,7 @@ void Animation::update(Mood currentMood)
 #if defined(BOARD_XIAO_C5)
         || currentMood == ALERT_CAMERA
 #endif
-        )
+    )
     {
         blinkMin = 6000;
         blinkMax = 12000;
@@ -328,7 +328,7 @@ void Animation::update(Mood currentMood)
 #if defined(BOARD_XIAO_C5)
              || currentMood == HUNTING
 #endif
-             )
+    )
         breathY_ = sin(now / 1500.0f) * 1.0f;
     else
         breathY_ = 0;
@@ -341,13 +341,13 @@ void Animation::update(Mood currentMood)
 #if defined(BOARD_XIAO_C5)
              || currentMood == ALERT_CAMERA
 #endif
-             )
+    )
         headTilt_ = sin(now / 150.0f) * 1.5f;
     else if (currentMood == DRIVING || currentMood == TACTICAL
 #if defined(BOARD_XIAO_C5)
              || currentMood == HUNTING
 #endif
-             )
+    )
         headTilt_ = sin(now / 1200.0f) * 2.0f;
     else
         headTilt_ = 0;

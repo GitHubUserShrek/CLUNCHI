@@ -17,6 +17,7 @@
 #include "wardriving.h"
 #include "alpr_detector.h"
 #include "tilt.h"
+#include "battery_manager.h"
 
 Display display;
 Audio audio;
@@ -103,6 +104,7 @@ void setup()
     wifiBegin();
     gpsBegin();
     gpsLoadTimeSettings();
+    batteryBegin();
     sdBegin();
 
 #if BLE_INIT_AT_BOOT
@@ -133,6 +135,7 @@ void loop()
     wifiProcessPortal();
     handleWifiLifecycle();
     gpsUpdate();
+    batteryUpdate();
 
     if (isRadarActive())
         bleUpdate();
@@ -149,11 +152,13 @@ void loop()
         wardrivingUpdate();
         gpsPrintStatus();
     }
+
 #if defined(BOARD_XIAO_C5)
     if (alprDetectorActive)
     {
         alprDetectorUpdate();
     }
+
 #endif
 
     if (wifiIsPortalActive())
@@ -182,12 +187,12 @@ void loop()
     handleTouch();
     tiltUpdate();
 
-    if (tiltEnabled() && !isMenuActive() && !wardrivingActive && 
+    if (tiltEnabled() && !isMenuActive() && !wardrivingActive &&
         !isRadarActive() && mood != SLEEPY
-    #if defined(BOARD_XIAO_C5)
+#if defined(BOARD_XIAO_C5)
         && !alprDetectorActive
-    #endif
-        )
+#endif
+    )
     {
         if (isDribbleActive())
         {
@@ -209,19 +214,32 @@ void loop()
     }
 
     if (!isRadarActive() && !isWardrivingActive()
-    #if defined(BOARD_XIAO_C5)
+#if defined(BOARD_XIAO_C5)
         && !isAlprDetectorActive()
-    #endif
-        )
+#endif
+    )
     {
         evaluateTaps();
     }
 
+
+
+    handlePeriodicLog(now);
     TouchEvent ev = consumeTouchEvent();
     moodUpdate(ev);
     animation.update(mood);
 
-    display.drawFace(mood, animation.getState());
+#if defined(BOARD_XIAO_C5)
+    if (mood == BATTERY_STATUS || mood == LOW_BATTERY)
+    {
+        display.drawBatteryFace(getBatteryPercentage(), getBatteryVoltage(), mood == LOW_BATTERY);
+    }
+    else
+#endif
+    {
+        display.drawFace(mood, animation.getState());
+    }
+
     display.drawStatusBar(isTouched, audio.getVolume());
 
     handlePeriodicLog(now);

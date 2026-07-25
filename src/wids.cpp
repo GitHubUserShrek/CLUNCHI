@@ -7,13 +7,13 @@
 #include <WiFi.h>
 #include <SD.h>
 
-#define BEACON_FLOOD_THRESHOLD    35     
-#define CTS_DURATION_SUSPICIOUS   20000  
-#define CTS_JAM_CLOSE_RANGE_MIN   50    
-#define CTS_JAM_FAR_RANGE_MIN     100   
-#define CTS_JAM_CLOSE_RSSI        -70   
-#define HANDSHAKE_WINDOW_MS       5000  
-#define BURST_DEDUP_MS            3000   
+#define BEACON_FLOOD_THRESHOLD 35
+#define CTS_DURATION_SUSPICIOUS 20000
+#define CTS_JAM_CLOSE_RANGE_MIN 50
+#define CTS_JAM_FAR_RANGE_MIN 100
+#define CTS_JAM_CLOSE_RSSI -70
+#define HANDSHAKE_WINDOW_MS 5000
+#define BURST_DEDUP_MS 3000
 
 #define MAX_TRACKED_BSSIDS 40
 static const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -38,16 +38,17 @@ static uint32_t _lastBeaconFloodCheck = 0;
 static uint8_t _trackedBssids[MAX_TRACKED_BSSIDS][6];
 static uint16_t _trackedBssidCount = 0;
 
-static uint16_t _ctsHighDurCount = 0;      
-static uint16_t _ctsTotalCount = 0;        
+static uint16_t _ctsHighDurCount = 0;
+static uint16_t _ctsTotalCount = 0;
 static uint32_t _lastCtsCheck = 0;
-static uint8_t _ctsWorstSource[6] = {0};   
+static uint8_t _ctsWorstSource[6] = {0};
 static uint32_t _ctsMaxDuration = 0;
 static int _ctsWorstRssi = -127;
 
 #define WIDS_QUEUE_SIZE 32
 
-struct WidsAlert {
+struct WidsAlert
+{
     AttackType type;
     uint8_t src[6];
     uint8_t dst[6];
@@ -84,18 +85,24 @@ String widsMacToString(const uint8_t *mac)
     return String(buf);
 }
 
-
 const char *widsAttackTypeString(AttackType type)
 {
     switch (type)
     {
-    case ATTACK_DEAUTH:            return "DEAUTH";
-    case ATTACK_DISASSOC:          return "DISASSOC";
-    case ATTACK_EVIL_TWIN:         return "EVIL_TWIN";
-    case ATTACK_CTS_JAMMING:       return "CTS_JAMMING";
-    case ATTACK_HANDSHAKE_CAPTURE: return "HANDSHAKE_CAPTURE";
-    case ATTACK_BEACON_FLOOD:      return "BEACON_FLOOD";
-    default:                        return "UNKNOWN";
+    case ATTACK_DEAUTH:
+        return "DEAUTH";
+    case ATTACK_DISASSOC:
+        return "DISASSOC";
+    case ATTACK_EVIL_TWIN:
+        return "EVIL_TWIN";
+    case ATTACK_CTS_JAMMING:
+        return "CTS_JAMMING";
+    case ATTACK_HANDSHAKE_CAPTURE:
+        return "HANDSHAKE_CAPTURE";
+    case ATTACK_BEACON_FLOOD:
+        return "BEACON_FLOOD";
+    default:
+        return "UNKNOWN";
     }
 }
 
@@ -103,21 +110,30 @@ const char *widsReasonString(uint16_t reason)
 {
     switch (reason)
     {
-    case 1:  return "Unspecified";
-    case 2:  return "Prev auth invalid";
-    case 3:  return "Station leaving";
-    case 4:  return "Inactivity timeout";
-    case 6:  return "Class 2 non-auth";
-    case 7:  return "Class 3 non-assoc";
-    case 8:  return "Station left BSS";
-    case 15: return "TSF invalid";
-    default: return (reason > 500) ? "Microseconds (NAV)" : "Unknown/Custom";
+    case 1:
+        return "Unspecified";
+    case 2:
+        return "Prev auth invalid";
+    case 3:
+        return "Station leaving";
+    case 4:
+        return "Inactivity timeout";
+    case 6:
+        return "Class 2 non-auth";
+    case 7:
+        return "Class 3 non-assoc";
+    case 8:
+        return "Station left BSS";
+    case 15:
+        return "TSF invalid";
+    default:
+        return (reason > 500) ? "Microseconds (NAV)" : "Unknown/Custom";
     }
 }
 
 void widsMacToBuf(const uint8_t *mac, char *outBuf)
 {
-    snprintf(outBuf, 18, "%02x:%02x:%02x:%02x:%02x:%02x", 
+    snprintf(outBuf, 18, "%02x:%02x:%02x:%02x:%02x:%02x",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
@@ -172,15 +188,15 @@ static void processQueuedThreat(const WidsAlert &alert)
     widsLastTime = alert.timestamp;
 
     portENTER_CRITICAL(&_widsLogMux);
-    
+
     if (widsLogCount > 0)
     {
         int lastIdx = (widsLogHead - 1 + WIDS_LOG_SIZE) % WIDS_LOG_SIZE;
         ThreatEvent &last = widsLog[lastIdx];
 
-        if (last.type == alert.type && 
+        if (last.type == alert.type &&
             (alert.timestamp - last.timestamp < BURST_DEDUP_MS) &&
-            memcmp(last.source, alert.src, 6) == 0 && 
+            memcmp(last.source, alert.src, 6) == 0 &&
             memcmp(last.destination, alert.dst, 6) == 0)
         {
             last.burstCount++;
@@ -203,10 +219,10 @@ static void processQueuedThreat(const WidsAlert &alert)
     e.firstTimestamp = alert.timestamp;
     e.burstCount = 1;
     e.isBroadcast = (memcmp(alert.dst, BROADCAST_MAC, 6) == 0);
-    e.isTargeted = _hasOurBSSID && 
-                   (memcmp(alert.bssid, _ourBSSID, 6) == 0 || 
+    e.isTargeted = _hasOurBSSID &&
+                   (memcmp(alert.bssid, _ourBSSID, 6) == 0 ||
                     memcmp(alert.dst, _ourBSSID, 6) == 0);
-    
+
     e.latitude = gpsData.latitude;
     e.longitude = gpsData.longitude;
     e.gpsValid = gpsData.valid;
@@ -219,60 +235,65 @@ static void processQueuedThreat(const WidsAlert &alert)
         widsLogCount++;
 
     _newAlert = true;
-    
+
     portEXIT_CRITICAL(&_widsLogMux);
 }
 
 static void IRAM_ATTR enqueueThreat(AttackType type, uint8_t *src, uint8_t *dst,
-                                     uint8_t *bssid, uint16_t param, int rssi, 
-                                     const char *notes)
+                                    uint8_t *bssid, uint16_t param, int rssi,
+                                    const char *notes)
 {
     portENTER_CRITICAL_ISR(&_queueMux);
-    
+
     size_t next = (_alertHead + 1) % WIDS_QUEUE_SIZE;
-    if (next == _alertTail) {
+    if (next == _alertTail)
+    {
         portEXIT_CRITICAL_ISR(&_queueMux);
         return;
     }
-    
+
     WidsAlert *a = (WidsAlert *)&_alertQueue[_alertHead];
     a->type = type;
-    memcpy((void*)a->src, src, 6);
-    memcpy((void*)a->dst, dst, 6);
-    memcpy((void*)a->bssid, bssid, 6);
+    memcpy((void *)a->src, src, 6);
+    memcpy((void *)a->dst, dst, 6);
+    memcpy((void *)a->bssid, bssid, 6);
     a->param = param;
     a->rssi = (int8_t)rssi;
     a->timestamp = millis();
-    
-    if (notes) {
-        strncpy((char*)a->notes, notes, sizeof(a->notes) - 1);
-        ((char*)a->notes)[sizeof(a->notes) - 1] = '\0';
-    } else {
-        ((char*)a->notes)[0] = '\0';
+
+    if (notes)
+    {
+        strncpy((char *)a->notes, notes, sizeof(a->notes) - 1);
+        ((char *)a->notes)[sizeof(a->notes) - 1] = '\0';
     }
-    
+    else
+    {
+        ((char *)a->notes)[0] = '\0';
+    }
+
     _alertHead = next;
     portEXIT_CRITICAL_ISR(&_queueMux);
 }
 
 static void drainThreatQueue()
 {
-    while (true) {
+    while (true)
+    {
         portENTER_CRITICAL(&_queueMux);
-        if (_alertTail == _alertHead) {
+        if (_alertTail == _alertHead)
+        {
             portEXIT_CRITICAL(&_queueMux);
             break;
         }
-        
+
         WidsAlert alert;
-        memcpy(&alert, (const void*)&_alertQueue[_alertTail], sizeof(WidsAlert));
+        memcpy(&alert, (const void *)&_alertQueue[_alertTail], sizeof(WidsAlert));
         _alertTail = (_alertTail + 1) % WIDS_QUEUE_SIZE;
         portEXIT_CRITICAL(&_queueMux);
-        
+
         processQueuedThreat(alert);
     }
 }
-
 
 static void handleDeauthFrame(uint8_t *payload, uint16_t len, uint8_t subtype, int rssi, uint32_t now)
 {
@@ -297,7 +318,7 @@ static void handleDeauthFrame(uint8_t *payload, uint16_t len, uint8_t subtype, i
         _lastDeauthTime = now;
         enqueueThreat(aType, sourceMac, destMac, bssidMac, reason, rssi, "Targeted");
     }
-    else if (rssi > -60) 
+    else if (rssi > -60)
     {
         _lastDeauthTime = now;
         enqueueThreat(aType, sourceMac, destMac, bssidMac, reason, rssi, "Close_Range");
@@ -306,7 +327,8 @@ static void handleDeauthFrame(uint8_t *payload, uint16_t len, uint8_t subtype, i
 
 static void handleBeaconFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t now)
 {
-    if (!_hasOurBSSID || len <= 36) return;
+    if (!_hasOurBSSID || len <= 36)
+        return;
 
     uint8_t *sourceMac = &payload[10];
     uint8_t *destMac = &payload[4];
@@ -316,9 +338,9 @@ static void handleBeaconFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t
     {
         if (_trackedBssidCount >= BEACON_FLOOD_THRESHOLD)
         {
-            enqueueThreat(ATTACK_BEACON_FLOOD, 
-                           (uint8_t *)BROADCAST_MAC, (uint8_t *)BROADCAST_MAC, 
-                           (uint8_t *)BROADCAST_MAC, _trackedBssidCount, rssi, "SSID_Flood");
+            enqueueThreat(ATTACK_BEACON_FLOOD,
+                          (uint8_t *)BROADCAST_MAC, (uint8_t *)BROADCAST_MAC,
+                          (uint8_t *)BROADCAST_MAC, _trackedBssidCount, rssi, "SSID_Flood");
         }
         _trackedBssidCount = 0;
         _lastBeaconFloodCheck = now;
@@ -366,7 +388,8 @@ static void handleBeaconFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t
 
 static void handleCtsFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t now)
 {
-    if (len < 10) return;
+    if (len < 10)
+        return;
 
     uint16_t duration = payload[1] | (payload[2] << 8);
     uint8_t *targetMac = &payload[4];
@@ -385,7 +408,8 @@ static void handleCtsFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t no
         }
     }
 
-    if (now - _lastCtsCheck < 1000) return;
+    if (now - _lastCtsCheck < 1000)
+        return;
 
     bool isJamming = false;
     char noteBuf[24];
@@ -404,8 +428,8 @@ static void handleCtsFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t no
     if (isJamming)
     {
         enqueueThreat(ATTACK_CTS_JAMMING, (uint8_t *)BROADCAST_MAC,
-                       _ctsWorstSource, _ctsWorstSource,
-                       _ctsMaxDuration, _ctsWorstRssi, noteBuf);
+                      _ctsWorstSource, _ctsWorstSource,
+                      _ctsMaxDuration, _ctsWorstRssi, noteBuf);
     }
 
     _ctsHighDurCount = 0;
@@ -418,11 +442,13 @@ static void handleCtsFrame(uint8_t *payload, uint16_t len, int rssi, uint32_t no
 
 static void handleDataFrame(uint8_t *payload, uint16_t len, uint8_t subtype, int rssi, uint32_t now)
 {
-    if (len < 24) return;
+    if (len < 24)
+        return;
 
     uint16_t hdrLen = (subtype == 8) ? 26 : 24;
-    if (len < hdrLen + 8) return;
-    
+    if (len < hdrLen + 8)
+        return;
+
     uint8_t *data = &payload[hdrLen];
 
     if (data[0] != 0xAA || data[1] != 0xAA || data[6] != 0x88 || data[7] != 0x8E)
@@ -433,8 +459,8 @@ static void handleDataFrame(uint8_t *payload, uint16_t len, uint8_t subtype, int
         uint8_t *destMac = &payload[4];
         uint8_t *sourceMac = &payload[10];
         uint8_t *bssidMac = &payload[16];
-        enqueueThreat(ATTACK_HANDSHAKE_CAPTURE, sourceMac, destMac, bssidMac, 
-                       0, rssi, "Forced_WPA_Capture");
+        enqueueThreat(ATTACK_HANDSHAKE_CAPTURE, sourceMac, destMac, bssidMac,
+                      0, rssi, "Forced_WPA_Capture");
     }
 }
 
@@ -444,7 +470,8 @@ static void IRAM_ATTR _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
     uint8_t *payload = pkt->payload;
     uint16_t len = pkt->rx_ctrl.sig_len;
 
-    if (len < 24) return;
+    if (len < 24)
+        return;
 
     uint8_t frameType = (payload[0] >> 2) & 0x03;
     uint8_t frameSubtype = (payload[0] >> 4) & 0x0F;
@@ -459,9 +486,10 @@ static void IRAM_ATTR _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
         {
             uint16_t reason = payload[24] | (payload[25] << 8);
             AttackType aType = (frameSubtype == 12) ? ATTACK_DEAUTH : ATTACK_DISASSOC;
-            
+
             bool targetingUs = _hasOurBSSID && (memcmp(bssidMac, _ourBSSID, 6) == 0);
-            if (targetingUs && reason > 1) { 
+            if (targetingUs && reason > 1)
+            {
                 enqueueThreat(aType, sourceMac, destMac, bssidMac, reason, pkt->rx_ctrl.rssi, "Targeted");
             }
             return;
@@ -470,12 +498,14 @@ static void IRAM_ATTR _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
         if (frameSubtype == 8 && _hasOurBSSID && len > 36)
         {
             uint8_t tagLen = payload[37];
-            if (payload[36] == 0 && tagLen > 0 && tagLen <= 32) {
+            if (payload[36] == 0 && tagLen > 0 && tagLen <= 32)
+            {
                 char ssidBuf[33];
                 memcpy(ssidBuf, &payload[38], tagLen);
                 ssidBuf[tagLen] = '\0';
 
-                if (strcmp(_ourSSID.c_str(), ssidBuf) == 0 && memcmp(bssidMac, _ourBSSID, 6) != 0) {
+                if (strcmp(_ourSSID.c_str(), ssidBuf) == 0 && memcmp(bssidMac, _ourBSSID, 6) != 0)
+                {
                     enqueueThreat(ATTACK_EVIL_TWIN, sourceMac, destMac, bssidMac, 0, pkt->rx_ctrl.rssi, "Rogue_BSSID");
                 }
             }
@@ -483,12 +513,14 @@ static void IRAM_ATTR _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
         }
     }
 
-    if (frameType == 1 && frameSubtype == 12) 
+    if (frameType == 1 && frameSubtype == 12)
     {
         uint16_t duration = payload[1] | (payload[2] << 8);
-        if (duration >= 20000) { 
+        if (duration >= 20000)
+        {
             _ctsHighDurCount++;
-            if (duration > _ctsMaxDuration) {
+            if (duration > _ctsMaxDuration)
+            {
                 _ctsMaxDuration = duration;
                 memcpy(_ctsWorstSource, &payload[4], 6);
                 _ctsWorstRssi = pkt->rx_ctrl.rssi;
@@ -500,9 +532,11 @@ static void IRAM_ATTR _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
     if (frameType == 2 && (frameSubtype == 0 || frameSubtype == 8))
     {
         uint16_t hdrLen = (frameSubtype == 8) ? 26 : 24;
-        if (len >= hdrLen + 8) {
+        if (len >= hdrLen + 8)
+        {
             uint8_t *data = &payload[hdrLen];
-            if (data[0] == 0xAA && data[1] == 0xAA && data[6] == 0x88 && data[7] == 0x8E) {
+            if (data[0] == 0xAA && data[1] == 0xAA && data[6] == 0x88 && data[7] == 0x8E)
+            {
                 enqueueThreat(ATTACK_HANDSHAKE_CAPTURE, &payload[10], &payload[4], &payload[16], 0, pkt->rx_ctrl.rssi, "WPA_Capture");
             }
         }
@@ -511,8 +545,9 @@ static void IRAM_ATTR _widsSniffer(void *buf, wifi_promiscuous_pkt_type_t type)
 
 void widsBegin()
 {
-    if (widsActive) return;
-    
+    if (widsActive)
+        return;
+
     if (!wifiConnected())
     {
         Serial.println("[WIDS] Cannot start — not connected to WiFi.");
@@ -549,20 +584,17 @@ void widsBegin()
     _ctsWorstRssi = -127;
     memset(_ctsWorstSource, 0, 6);
 
-
     initSdLogFile();
 
-
     wifi_promiscuous_filter_t filter = {
-        .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | 
-                       WIFI_PROMIS_FILTER_MASK_CTRL | 
-                       WIFI_PROMIS_FILTER_MASK_DATA
-    };
+        .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT |
+                       WIFI_PROMIS_FILTER_MASK_CTRL |
+                       WIFI_PROMIS_FILTER_MASK_DATA};
     esp_wifi_set_promiscuous_filter(&filter);
-    
+
     wifi_promiscuous_filter_t ctrlFilter = {.filter_mask = WIFI_PROMIS_CTRL_FILTER_MASK_ALL};
     esp_wifi_set_promiscuous_ctrl_filter(&ctrlFilter);
-    
+
     esp_wifi_set_promiscuous_rx_cb(_widsSniffer);
     esp_wifi_set_promiscuous(true);
 
@@ -573,11 +605,12 @@ void widsBegin()
 
 void widsEnd()
 {
-    if (!widsActive) return;
-    
+    if (!widsActive)
+        return;
+
     esp_wifi_set_promiscuous(false);
     widsActive = false;
-    Serial.printf("[WIDS] Detector stopped. Total anomaly frames: %lu\n", 
+    Serial.printf("[WIDS] Detector stopped. Total anomaly frames: %lu\n",
                   (unsigned long)widsTotalCount);
 }
 
@@ -585,11 +618,13 @@ bool isWidsActive() { return widsActive; }
 
 static void logAlertToSD(const ThreatEvent e)
 {
-    if (!sdActive) return;
-    
+    if (!sdActive)
+        return;
+
     if (_sessionFilePath == "")
         initSdLogFile();
-    if (_sessionFilePath == "") return;
+    if (_sessionFilePath == "")
+        return;
 
     File f = SD.open(_sessionFilePath.c_str(), FILE_APPEND);
     if (!f)
@@ -602,21 +637,23 @@ static void logAlertToSD(const ThreatEvent e)
     String dstMac = widsMacToString(e.destination);
     String srcVendor = lookupOUI(srcMac);
     String dstVendor = lookupOUI(dstMac);
-    if (srcVendor == "") srcVendor = "Unknown";
-    if (dstVendor == "") dstVendor = "Unknown";
+    if (srcVendor == "")
+        srcVendor = "Unknown";
+    if (dstVendor == "")
+        dstVendor = "Unknown";
 
     String flags = e.isBroadcast ? "BROADCAST" : (e.isTargeted ? "TARGETED" : "GENERAL");
 
     char line[512];
     snprintf(line, sizeof(line), "%s,%.6f,%.6f,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s",
-             getWidsTimeString().c_str(), 
-             e.gpsValid ? e.latitude : 0.0, 
+             getWidsTimeString().c_str(),
+             e.gpsValid ? e.latitude : 0.0,
              e.gpsValid ? e.longitude : 0.0,
-             widsAttackTypeString(e.type), 
-             srcMac.c_str(), srcVendor.c_str(), 
+             widsAttackTypeString(e.type),
+             srcMac.c_str(), srcVendor.c_str(),
              dstMac.c_str(), dstVendor.c_str(),
-             widsMacToString(e.bssid).c_str(), 
-             e.param, e.rssi, e.burstCount, 
+             widsMacToString(e.bssid).c_str(),
+             e.param, e.rssi, e.burstCount,
              flags.c_str(), e.customNotes);
     f.println(line);
     f.flush();
@@ -625,8 +662,9 @@ static void logAlertToSD(const ThreatEvent e)
 
 void widsUpdate()
 {
-    if (!widsActive) return;
-    
+    if (!widsActive)
+        return;
+
     if (!wifiConnected())
     {
         widsEnd();
@@ -638,10 +676,10 @@ void widsUpdate()
     if (_newAlert)
     {
         _newAlert = false;
-        
+
         ThreatEvent eventCopy;
         bool haveEvent = false;
-        
+
         portENTER_CRITICAL(&_widsLogMux);
         if (widsLogCount > 0)
         {
@@ -650,17 +688,19 @@ void widsUpdate()
             haveEvent = true;
         }
         portEXIT_CRITICAL(&_widsLogMux);
-        
+
         if (haveEvent && (eventCopy.burstCount == 1 || eventCopy.burstCount % 25 == 0))
         {
             char srcMac[18], dstMac[18];
             widsMacToBuf(eventCopy.source, srcMac);
             widsMacToBuf(eventCopy.destination, dstMac);
-            
+
             String srcVendor = lookupOUI(srcMac);
             String dstVendor = lookupOUI(dstMac);
-            if (srcVendor.isEmpty()) srcVendor = "Unknown";
-            if (dstVendor.isEmpty()) dstVendor = "Unknown";
+            if (srcVendor.isEmpty())
+                srcVendor = "Unknown";
+            if (dstVendor.isEmpty())
+                dstVendor = "Unknown";
 
             const char *flags = eventCopy.isBroadcast ? "BROADCAST" : (eventCopy.isTargeted ? "TARGETED" : "GENERAL");
 
@@ -682,7 +722,7 @@ void widsUpdate()
         if (widsTotalCount > 0)
         {
             Serial.printf("[WIDS Status] %lu attack frames logged. Last incident %lus ago.\n",
-                          (unsigned long)widsTotalCount, 
+                          (unsigned long)widsTotalCount,
                           (unsigned long)((now - widsLastTime) / 1000));
         }
     }
@@ -690,7 +730,8 @@ void widsUpdate()
 
 bool widsHasRecentAlert(uint32_t withinMs)
 {
-    if (widsTotalCount == 0) return false;
+    if (widsTotalCount == 0)
+        return false;
     return (millis() - widsLastTime) <= withinMs;
 }
 
@@ -698,7 +739,7 @@ uint32_t widsRecentCount(uint32_t withinMs)
 {
     uint32_t count = 0;
     uint32_t cutoff = millis() - withinMs;
-    
+
     portENTER_CRITICAL(&_widsLogMux);
     for (int i = 0; i < widsLogCount; i++)
     {
@@ -707,26 +748,33 @@ uint32_t widsRecentCount(uint32_t withinMs)
             count += widsLog[idx].burstCount;
     }
     portEXIT_CRITICAL(&_widsLogMux);
-    
+
     return count;
 }
 
 uint8_t widsThreatScore()
 {
-    if (widsTotalCount == 0) return 0;
-    
+    if (widsTotalCount == 0)
+        return 0;
+
     uint8_t score = 0;
     uint32_t now = millis();
     uint32_t msSinceLast = now - widsLastTime;
 
-    if (msSinceLast < 2000)       score += 40;
-    else if (msSinceLast < 10000) score += 20;
-    else if (msSinceLast < 60000) score += 10;
-    
-    uint32_t recent = widsRecentCount(10000);  
-    if (recent >= 50)      score += 50;
-    else if (recent >= 15) score += 30;
-    else if (recent >= 5)  score += 15;
+    if (msSinceLast < 2000)
+        score += 40;
+    else if (msSinceLast < 10000)
+        score += 20;
+    else if (msSinceLast < 60000)
+        score += 10;
+
+    uint32_t recent = widsRecentCount(10000);
+    if (recent >= 50)
+        score += 50;
+    else if (recent >= 15)
+        score += 30;
+    else if (recent >= 5)
+        score += 15;
 
     portENTER_CRITICAL(&_widsLogMux);
     for (int i = 0; i < widsLogCount; i++)
@@ -734,17 +782,23 @@ uint8_t widsThreatScore()
         int idx = getLogIndex(i);
         if (now - widsLog[idx].timestamp < 30000)
         {
-            if (widsLog[idx].isTargeted)                                    score += 30;
-            if (widsLog[idx].type == ATTACK_EVIL_TWIN)                      score += 40;
-            if (widsLog[idx].type == ATTACK_HANDSHAKE_CAPTURE)              score += 35;
-            if (widsLog[idx].type == ATTACK_BEACON_FLOOD)                   score += 30;
-            if (widsLog[idx].type == ATTACK_CTS_JAMMING)                    score += 30;
-            if (widsLog[idx].type == ATTACK_DEAUTH || 
-                widsLog[idx].type == ATTACK_DISASSOC)                       score += 25;
+            if (widsLog[idx].isTargeted)
+                score += 30;
+            if (widsLog[idx].type == ATTACK_EVIL_TWIN)
+                score += 40;
+            if (widsLog[idx].type == ATTACK_HANDSHAKE_CAPTURE)
+                score += 35;
+            if (widsLog[idx].type == ATTACK_BEACON_FLOOD)
+                score += 30;
+            if (widsLog[idx].type == ATTACK_CTS_JAMMING)
+                score += 30;
+            if (widsLog[idx].type == ATTACK_DEAUTH ||
+                widsLog[idx].type == ATTACK_DISASSOC)
+                score += 25;
         }
     }
     portEXIT_CRITICAL(&_widsLogMux);
-    
+
     return (score > 100) ? 100 : score;
 }
 
@@ -754,7 +808,7 @@ uint8_t widsUniqueSourceCount()
 {
     uint8_t unique[WIDS_LOG_SIZE][6];
     uint8_t count = 0;
-    
+
     portENTER_CRITICAL(&_widsLogMux);
     for (int i = 0; i < widsLogCount; i++)
     {
@@ -775,21 +829,22 @@ uint8_t widsUniqueSourceCount()
         }
     }
     portEXIT_CRITICAL(&_widsLogMux);
-    
+
     return count;
 }
 
 int widsMostActiveSourceIndex()
 {
-    if (widsLogCount == 0) return -1;
-    
+    if (widsLogCount == 0)
+        return -1;
+
     uint8_t macs[WIDS_LOG_SIZE][6];
     uint32_t counts[WIDS_LOG_SIZE] = {0};
     uint8_t macCount = 0;
     int resultIdx = -1;
-    
+
     portENTER_CRITICAL(&_widsLogMux);
-    
+
     for (int i = 0; i < widsLogCount; i++)
     {
         int idx = getLogIndex(i);
@@ -810,7 +865,7 @@ int widsMostActiveSourceIndex()
             macCount++;
         }
     }
-    
+
     uint32_t maxCount = 0;
     int maxMacIdx = 0;
     for (int i = 0; i < macCount; i++)
@@ -821,7 +876,7 @@ int widsMostActiveSourceIndex()
             maxMacIdx = i;
         }
     }
-    
+
     for (int i = 0; i < widsLogCount; i++)
     {
         int idx = getLogIndex(i);
@@ -831,10 +886,11 @@ int widsMostActiveSourceIndex()
             break;
         }
     }
-    if (resultIdx == -1) resultIdx = getLogIndex(0);
-    
+    if (resultIdx == -1)
+        resultIdx = getLogIndex(0);
+
     portEXIT_CRITICAL(&_widsLogMux);
-    
+
     return resultIdx;
 }
 
@@ -842,21 +898,20 @@ void widsPrintInfo()
 {
     Serial.println("\n[CLUNCHI Tactical WIDS] ===============================");
     Serial.printf(" Status:         %s\n", widsActive ? "ACTIVE" : "INACTIVE");
-    
+
     if (widsActive || widsTotalCount > 0)
     {
         Serial.printf(" Monitoring Ch:  %d\n", WiFi.channel());
-        Serial.printf(" Protected AP:   %s (%s)\n", _ourSSID.c_str(), 
+        Serial.printf(" Protected AP:   %s (%s)\n", _ourSSID.c_str(),
                       _hasOurBSSID ? widsMacToString(_ourBSSID).c_str() : "None");
-        Serial.printf(" SD Logging:     %s\n", sdActive ? 
-                      (_sessionFilePath != "" ? _sessionFilePath.c_str() : "PENDING") : "DISABLED");
+        Serial.printf(" SD Logging:     %s\n", sdActive ? (_sessionFilePath != "" ? _sessionFilePath.c_str() : "PENDING") : "DISABLED");
         Serial.printf(" Total Incidents:%lu frames\n", (unsigned long)widsTotalCount);
-        
+
         if (widsTotalCount > 0)
-            Serial.printf(" Last Attack:    %lus ago\n", 
+            Serial.printf(" Last Attack:    %lus ago\n",
                           (unsigned long)((millis() - widsLastTime) / 1000));
-        
-        Serial.printf(" Threat Score:   %d/100 (%s)\n", widsThreatScore(), 
+
+        Serial.printf(" Threat Score:   %d/100 (%s)\n", widsThreatScore(),
                       widsUnderAttack() ? "ATTACK DETECTED!" : "Normal");
         Serial.printf(" Unique Attackers: %d\n", widsUniqueSourceCount());
     }
@@ -870,45 +925,50 @@ void widsPrintLog()
         Serial.println("[CLUNCHI] Attack log is empty.");
         return;
     }
-    
+
     ThreatEvent snapshot[WIDS_LOG_SIZE];
     int snapCount = 0;
-    
+
     portENTER_CRITICAL(&_widsLogMux);
     snapCount = widsLogCount;
     for (int i = 0; i < snapCount; i++)
     {
         int idx = getLogIndex(i);
-        snapshot[i] = widsLog[idx]; 
+        snapshot[i] = widsLog[idx];
     }
     portEXIT_CRITICAL(&_widsLogMux);
-    
+
     Serial.printf("\n--- CLUNCHI Incident Log (Last %d Events) ---\n", snapCount);
-    
+
     for (int i = 0; i < snapCount; i++)
     {
-        ThreatEvent &e = snapshot[i];  
+        ThreatEvent &e = snapshot[i];
         uint32_t ago = (millis() - e.timestamp) / 1000;
         uint32_t duration = (e.timestamp - e.firstTimestamp) / 1000;
-        
+
         String srcMac = widsMacToString(e.source);
         String dstMac = widsMacToString(e.destination);
         String srcVendor = lookupOUI(srcMac);
         String dstVendor = lookupOUI(dstMac);
-        if (srcVendor == "") srcVendor = "Unknown";
-        if (dstVendor == "") dstVendor = "Unknown";
+        if (srcVendor == "")
+            srcVendor = "Unknown";
+        if (dstVendor == "")
+            dstVendor = "Unknown";
 
         String flags = "";
-        if (e.isBroadcast) flags += "[BROADCAST] ";
-        if (e.isTargeted)  flags += "[TARGETED] ";
-        if (e.gpsValid)    flags += String("[GPS: ") + String(e.latitude, 4) + "," + String(e.longitude, 4) + "] ";
+        if (e.isBroadcast)
+            flags += "[BROADCAST] ";
+        if (e.isTargeted)
+            flags += "[TARGETED] ";
+        if (e.gpsValid)
+            flags += String("[GPS: ") + String(e.latitude, 4) + "," + String(e.longitude, 4) + "] ";
 
         Serial.printf("[%2d] %-17s | x%-4d pkts | %3lus ago | %s (%s) -> %s (%s)\n",
                       i + 1, widsAttackTypeString(e.type), e.burstCount, ago,
-                      srcMac.c_str(), srcVendor.c_str(), 
+                      srcMac.c_str(), srcVendor.c_str(),
                       dstMac.c_str(), dstVendor.c_str());
         Serial.printf("     +- Param: %d (%s) | RSSI: %ddBm | Duration: %lus | Notes: %s %s\n",
-                      e.param, widsReasonString(e.param), e.rssi, duration, 
+                      e.param, widsReasonString(e.param), e.rssi, duration,
                       e.customNotes, flags.c_str());
     }
     Serial.println("-------------------------------------------\n");

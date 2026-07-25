@@ -49,6 +49,8 @@ public:
 
     void drawRssiBars(int x, int y, int bars);
 
+    void drawBatteryFace(int percentage, float voltage, bool isLow);
+
 
     #if defined(BOARD_XIAO_C5)
     void drawHuntingReticle();

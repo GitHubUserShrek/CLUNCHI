@@ -3,14 +3,17 @@
 
 #if defined(BOARD_XIAO_C5)
 
-#define ALPR_ENABLE_BLE 1 
+#define ALPR_ENABLE_BLE 1
 
-#define ALPR_SEEN_CAPACITY    2048
-#define ALPR_CHANNEL_DWELL_MS 200
-#define ALPR_ALERT_COOLDOWN_MS 5000
-#define ALPR_REDISCOVER_MS     30000
-#define ALPR_RSSI_MIN          -95
-#define ALPR_DEBUG_LOG_ALL     1
+#define ALPR_SEEN_CAPACITY       2048
+#define ALPR_CHANNEL_DWELL_MS    250
+#define ALPR_ALERT_COOLDOWN_MS   5000
+#define ALPR_REDISCOVER_MS       30000
+#define ALPR_RSSI_MIN            -95
+
+#ifndef ALPR_DEBUG_LOG_ALL
+#define ALPR_DEBUG_LOG_ALL 0
+#endif
 
 #define ALPR_CONFIDENCE_DEFINITE  90
 #define ALPR_CONFIDENCE_LIKELY    70
@@ -115,7 +118,7 @@ ALPRVendor alprIdentifyVendor(const uint8_t* mac);
 ALPRDeviceType alprGuessDeviceType(ALPRVendor v, const char* ssid);
 bool isALPRSSID(const char* ssid);
 
-#else  
+#else
 
 inline bool isAlprDetectorActive() { return false; }
 inline void alprDetectorBegin() {}
